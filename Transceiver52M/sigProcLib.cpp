@@ -48,6 +48,8 @@ static const float M_1_2PI_F = 1/M_2PI_F;
 signalVector *GMSKRotation = NULL;
 signalVector *GMSKReverseRotation = NULL;
 
+signalVector *C1Pulse = NULL;
+
 /** Static ideal RACH and midamble correlation waveforms */
 typedef struct {
   signalVector *sequence;
@@ -230,6 +232,8 @@ void initGMSKRotationTables(int samplesPerSymbol) {
 void sigProcLibSetup(int samplesPerSymbol) {
   initTrigTables();
   initGMSKRotationTables(samplesPerSymbol);
+
+  C1Pulse = generateC1Pulse(2, samplesPerSymbol);
 }
 
 void GMSKRotate(signalVector &x) {
@@ -434,24 +438,123 @@ signalVector* convolve(const signalVector *a,
   return c;
 }
 
+signalVector *generateC1Pulse(int symbolLength, int samplesPerSymbol)
+{
+  int numSamples;
+
+  switch (samplesPerSymbol) {
+  case 4:
+    numSamples = 7;
+    break;
+  default:
+    return NULL;
+  }
+
+  signalVector *x = new signalVector(numSamples);
+  signalVector::iterator xP = x->begin();
+
+  switch (samplesPerSymbol) {
+  case 4:
+    /* BT = 0.30 */
+    *xP++ = 8.16373112e-03;
+    *xP++ = 2.84385729e-02;
+    *xP++ = 5.64158904e-02;
+    *xP++ = 7.05463553e-02;
+    *xP++ = 5.64158904e-02;
+    *xP++ = 2.84385729e-02;
+    *xP++ = 8.16373112e-03;
+  }
+
+  x->isRealOnly(true);
+  x->setSymmetry(ABSSYM);
+  return x;
+}
 
 signalVector* generateGSMPulse(int symbolLength,
 			       int samplesPerSymbol)
 {
+  int numSamples;
 
-  int numSamples = samplesPerSymbol*symbolLength + 1;
-  signalVector *x = new signalVector(numSamples);
-  signalVector::iterator xP = x->begin();
-  int centerPoint = (numSamples-1)/2;
-  for (int i = 0; i < numSamples; i++) {
-    float arg = (float) (i-centerPoint)/(float) samplesPerSymbol;
-    *xP++ = 0.96*exp(-1.1380*arg*arg-0.527*arg*arg*arg*arg); // GSM pulse approx.
+  switch (samplesPerSymbol) {
+  case 2:
+    numSamples = 9;
+    break;
+  case 4:
+    numSamples = 15;
+    break;
+  case 8:
+    numSamples = 31;
+    break;
+  default:
+    return NULL;
   }
 
-  float avgAbsval = sqrtf(vectorNorm2(*x)/samplesPerSymbol);
-  xP = x->begin();
-  for (int i = 0; i < numSamples; i++) 
-    *xP++ /= avgAbsval;
+  signalVector *x = new signalVector(numSamples);
+  signalVector::iterator xP = x->begin();
+
+  switch (samplesPerSymbol) {
+  case 2:
+    *xP++ = 4.36058717e-03;
+    *xP++ = 9.68286707e-02;
+    *xP++ = 4.71071160e-01;
+    *xP++ = 8.80478683e-01;
+    *xP++ = 9.87907028e-01;
+    *xP++ = 8.80478683e-01;
+    *xP++ = 4.71071160e-01;
+    *xP++ = 9.68286707e-02;
+    *xP++ = 4.36058717e-03;
+    break;
+  case 4:
+    *xP++ = 4.46348606e-03;
+    *xP++ = 2.84385729e-02;
+    *xP++ = 1.03184855e-01;
+    *xP++ = 2.56065552e-01;
+    *xP++ = 4.76375085e-01;
+    *xP++ = 7.05961177e-01;
+    *xP++ = 8.71291644e-01;
+    *xP++ = 9.29453645e-01;
+    *xP++ = 8.71291644e-01;
+    *xP++ = 7.05961177e-01;
+    *xP++ = 4.76375085e-01;
+    *xP++ = 2.56065552e-01;
+    *xP++ = 1.03184855e-01;
+    *xP++ = 2.84385729e-02;
+    *xP++ = 4.46348606e-03;
+    break;
+  case 8:
+    *xP++ = 1.20588778e-03;
+    *xP++ = 4.68638505e-03;
+    *xP++ = 1.28516289e-02;
+    *xP++ = 2.93256768e-02;
+    *xP++ = 5.85838642e-02;
+    *xP++ = 1.04977278e-01;
+    *xP++ = 1.71413309e-01;
+    *xP++ = 2.58189156e-01;
+    *xP++ = 3.62352112e-01;
+    *xP++ = 4.77704891e-01;
+    *xP++ = 5.95506002e-01;
+    *xP++ = 7.05888465e-01;
+    *xP++ = 7.99732460e-01;
+    *xP++ = 8.70264931e-01;
+    *xP++ = 9.13611171e-01;
+    *xP++ = 9.28180289e-01;
+    *xP++ = 9.13611171e-01;
+    *xP++ = 8.70264931e-01;
+    *xP++ = 7.99732460e-01;
+    *xP++ = 7.05888465e-01;
+    *xP++ = 5.95506002e-01;
+    *xP++ = 4.77704891e-01;
+    *xP++ = 3.62352112e-01;
+    *xP++ = 2.58189156e-01;
+    *xP++ = 1.71413309e-01;
+    *xP++ = 1.04977278e-01;
+    *xP++ = 5.85838642e-02;
+    *xP++ = 2.93256768e-02;
+    *xP++ = 1.28516289e-02;
+    *xP++ = 4.68638505e-03;
+    *xP++ = 1.20588778e-03;
+  }
+
   x->isRealOnly(true);
   x->setSymmetry(ABSSYM);
   return x;
@@ -566,16 +669,17 @@ signalVector *modulateBurst(const BitVector &wBurst,
 			    int guardPeriodLength,
 			    int samplesPerSymbol)
 {
-
-  //static complex staticBurst[157];
-
   int burstSize = samplesPerSymbol*(wBurst.size()+guardPeriodLength);
-  //signalVector modBurst((complex *) staticBurst,0,burstSize);
-  signalVector modBurst(burstSize);// = new signalVector(burstSize);
+  signalVector modBurst(burstSize);
+  signalVector modBurstC1(burstSize);
+
   modBurst.isRealOnly(true);
-  //memset(staticBurst,0,sizeof(complex)*burstSize);
   modBurst.fill(0.0);
   signalVector::iterator modBurstItr = modBurst.begin();
+
+  modBurstC1.isRealOnly(false);
+  modBurstC1.fill(0.0);
+  signalVector::iterator modBurstC1Itr = modBurstC1.begin();
 
 #if 0 
   // if wBurst is already differentially decoded
@@ -602,13 +706,33 @@ signalVector *modulateBurst(const BitVector &wBurst,
 #endif
   modBurst.isRealOnly(false);
 
-  // filter w/ pulse shape
-  signalVector *shapedBurst = convolve(&modBurst,&gsmPulse,NULL,NO_DELAY);
+  // Generate C1 phase coefficients
+  modBurstItr = modBurst.begin();
+  modBurstItr += samplesPerSymbol * 2;
+  modBurstC1Itr += samplesPerSymbol * 2;
 
-  //delete modBurst;
-  
+  for (unsigned int i = 2; i < wBurst.size(); i++) {
+    float phase = 2.0*((wBurst[i-1] & 0x01) ^ (wBurst[i-2] & 0x01)) -1.0;
+    *modBurstC1Itr = *modBurstItr * Complex<float>(0, phase);
+
+    modBurstItr += samplesPerSymbol;
+    modBurstC1Itr += samplesPerSymbol;
+  }
+
+  // filter with primary C0 and second C1 pulse shapes
+  signalVector *shapedBurst = convolve(&modBurst,&gsmPulse,NULL,START_ONLY);
+  signalVector *shapedBurst2 = convolve(&modBurstC1,C1Pulse,NULL,START_ONLY);
+
+  // sum pulse shaped outputs
+  modBurstItr = shapedBurst->begin(); 
+  modBurstC1Itr = shapedBurst2->begin();
+  for (unsigned int i = 0; i < shapedBurst->size(); i++ ) {
+    *modBurstItr++ += *modBurstC1Itr++;
+  }
+
+  delete shapedBurst2;
+
   return shapedBurst;
-
 }
 
 float sinc(float x) 

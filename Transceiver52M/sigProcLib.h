@@ -131,6 +131,9 @@ signalVector* convolve(const signalVector *a,
 signalVector* generateGSMPulse(int samplesPerSymbol,
 			       int symbolLength);
 
+signalVector* generateC1Pulse(int samplesPerSymbol,
+			      int symbolLength);
+
 /** 
         Frequency shift a vector.
 	@param y The frequency shifted vector.
