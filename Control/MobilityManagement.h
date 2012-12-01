@@ -33,15 +33,70 @@ class LogicalChannel;
 class L3CMServiceRequest;
 class L3LocationUpdatingRequest;
 class L3IMSIDetachIndication;
+class L3SRES;
+class L3RAND;
+class L3CipheringKeySequenceNumber;
+class L3MobileIdentity;
 };
 
 namespace Control {
+
+class AuthenticationParameters {
+
+	private:
+	GSM::L3MobileIdentity mMobileID;
+	GSM::L3SRES mSRES;
+	GSM::L3RAND mRAND;
+	GSM::L3CipheringKeySequenceNumber mCKSN;
+	uint64_t mKC;
+	bool mRANDset;
+	bool mKCset;
+
+	public:
+
+	AuthenticationParameters(GSM::L3MobileIdentity wMobileID)
+		:mMobileID(wMobileID),
+		mSRES(0),
+		mRAND(0,0),
+		mCKSN(0),
+		mKC(0),
+		mRANDset(false),
+		mKCset(false)
+	{}
+
+	void CKSN(unsigned wCKSN)
+		{ mCKSN.CIValue(wCKSN); }
+	void SRES(uint32_t wSRES)
+		{ mSRES.value(wSRES); }
+
+	void RANDstr(string strRAND);
+	void KCstr(string strKC);
+
+	string SRESstr() const;
+	string RANDstr() const;
+	string KCstr() const;
+
+	const GSM::L3RAND& RAND() const
+		{ return mRAND; }
+	const GSM::L3CipheringKeySequenceNumber& CKSN() const
+		{ return mCKSN; }
+	const GSM::L3MobileIdentity& mobileID() const
+		{ return mMobileID; }
+	bool isRANDset()
+		{ return mRANDset; }
+	bool isKCset()
+		{ return mKCset; }
+};
 
 void CMServiceResponder(const GSM::L3CMServiceRequest* cmsrq, GSM::LogicalChannel* DCCH);
 
 void IMSIDetachController(const GSM::L3IMSIDetachIndication* idi, GSM::LogicalChannel* DCCH);
 
 void LocationUpdatingController(const GSM::L3LocationUpdatingRequest* lur, GSM::LogicalChannel* DCCH);
+
+bool registerIMSI(AuthenticationParameters& authParams, GSM::LogicalChannel* LCH);
+
+bool authenticate (AuthenticationParameters& authParams, GSM::LogicalChannel* LCH);
 
 }
 

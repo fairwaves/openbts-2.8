@@ -100,7 +100,8 @@ void Control::IMSIDetachController(const L3IMSIDetachIndication* idi, LogicalCha
 		// FIXME -- Resolve TMSIs to IMSIs.
 		if (idi->mobileID().type()==IMSIType) {
 			SIPEngine engine(gConfig.getStr("SIP.Proxy.Registration").c_str(), idi->mobileID().digits());
-			engine.unregister();
+			AuthenticationParameters authParams(idi->mobileID());
+			engine.unregister(authParams);
 		}
 	}
 	catch(SIPTimeout) {
@@ -173,22 +174,12 @@ void Control::LocationUpdatingController(const L3LocationUpdatingRequest* lur, L
 	// Try to register the IMSI.
 	// This will be set true if registration succeeded in the SIP world.
 	bool success = false;
-	try {
-		SIPEngine engine(gConfig.getStr("SIP.Proxy.Registration").c_str(),IMSI);
-		LOG(DEBUG) << "waiting for registration of " << IMSI << " on " << gConfig.getStr("SIP.Proxy.Registration");
-		success = engine.Register(SIPEngine::SIPRegister); 
-	}
-	catch(SIPTimeout) {
-		LOG(ALERT) "SIP registration timed out.  Is the proxy running at " << gConfig.getStr("SIP.Proxy.Registration");
-		// Reject with a "network failure" cause code, 0x11.
-		DCCH->send(L3LocationUpdatingReject(0x11));
-		gReports.incr("OpenBTS.GSM.MM.LUR.Timeout");
-		// HACK -- wait long enough for a response
-		// FIXME -- Why are we doing this?
-		sleep(4);
-		// Release the channel and return.
-		DCCH->send(L3ChannelRelease());
-		return;
+	AuthenticationParameters authParams(mobileID);
+	success = registerIMSI(authParams, DCCH);
+	
+	if (success && (gConfig.getNum("GSM.Encryption")))
+	{
+		success = authenticate(authParams, DCCH);
 	}
 
 	// This allows us to configure Open Registration
@@ -328,7 +319,147 @@ void Control::LocationUpdatingController(const L3LocationUpdatingRequest* lur, L
 	return;
 }
 
+bool Control::registerIMSI(Control::AuthenticationParameters& authParams, GSM::LogicalChannel* LCH)
+{
+	// Try to register the IMSI.
+	// This will be set true if registration succeeded in the SIP world.
+	try {
+		SIPEngine engine(gConfig.getStr("SIP.Proxy.Registration").c_str(),authParams.mobileID().digits());
+		LOG(DEBUG) << "waiting for registration of " << authParams.mobileID() << " on " << gConfig.getStr("SIP.Proxy.Registration");
+		return engine.Register(SIPEngine::SIPRegister, authParams); 
+	}
+	catch(SIPTimeout) {
+		LOG(ALERT) << "SIP registration timed out.  Is the proxy running at " << gConfig.getStr("SIP.Proxy.Registration");
+		// Reject with a "network failure" cause code, 0x11.
+		LCH->send(L3LocationUpdatingReject(0x11));
+		gReports.incr("OpenBTS.GSM.MM.LUR.Timeout");
+		// HACK -- wait long enough for a response
+		// FIXME -- Why are we doing this?
+		sleep(4);
+		// Release the channel and return.
+		LCH->send(L3ChannelRelease());
+		return false;
+	}
+}
 
+bool Control::authenticate (AuthenticationParameters& authParams, GSM::LogicalChannel* LCH)
+{
+	bool success = false;
+	// Did we get a RAND for challenge-response?
+	if (authParams.isRANDset()) {
+		// Request the mobile's SRES.
+		LCH->send(L3AuthenticationRequest(authParams.CKSN(), authParams.RAND()));
+		LOG(DEBUG) << "SEND L3AuthenticationResponse " << L3AuthenticationRequest(authParams.CKSN(), authParams.RAND());
+		L3Message* msg = getMessage(LCH);
+		L3AuthenticationResponse *resp = dynamic_cast<L3AuthenticationResponse*>(msg);
+		if (!resp) {
+			if (msg) {
+				LOG(DEBUG) << "Wait L3AuthenticationResponse, but Unexpected message " << *msg;
+				delete msg;
+			}
+			// FIXME -- We should differentiate between wrong message and no message at all.
+			throw UnexpectedMessage();
+		}
+		authParams.SRES((resp->SRES()).value());
+		LOG(DEBUG) << "Recieve L3AuthenticationResponse "<<*resp;
+		delete msg;
+		
+		// verify SRES
+		if (registerIMSI(authParams, LCH)) {
+			if (authParams.isKCset()) {
+				LCH->setKc(authParams.KCstr().c_str());
+				LOG(DEBUG) << "Ciphering key set for LCH , KC = " << authParams.KCstr().c_str();
+				LCH->send(GSM::L3CipheringModeCommand(1)); // FIXME: use actual a5/#
+				LCH->activateDecryption();
+				LOG(DEBUG) << "Decryption activated: Ciphering Mode Command sent over " << LCH->type();
+				L3Message* mc_msg = getMessage(LCH);
+				L3CipheringModeComplete *mode_compl = dynamic_cast<L3CipheringModeComplete*>(mc_msg);
+				if(!mode_compl) {
+					if (mc_msg) {
+						LOG(DEBUG) << "Wait L3CipheringModeComplet, but Unexpected message " << *msg;
+						delete mc_msg;
+					}
+					// FIXME -- We should differentiate between wrong message and no message at all.
+					throw UnexpectedMessage();
+				}
+				else {
+					LOG(DEBUG) << *mode_compl << "Responce received, activating encryption.";
+					LCH->activateEncryption();
+					delete mc_msg;
+					LOG(DEBUG) << "Authenticate success for" << authParams.mobileID();
+					success = true;
+				}
+			}
+		}
+		else {
+			LOG(DEBUG) << "Failed to verify SRES";
+		}
+	}
+	else {
+		LOG(DEBUG) << "Failed to obtain RAND";
+	}
+	return success;
+}
+
+void AuthenticationParameters::RANDstr(string strRAND)
+{
+	uint64_t hRAND;
+	uint64_t lRAND;
+	assert(strRAND.size() == 32);
+	string strhRAND = strRAND.substr(0, 16);
+	string strlRAND = strRAND.substr(16, 16);
+	stringstream ssh;
+	ssh << hex << strhRAND;
+	ssh >> hRAND;
+	stringstream ssl;
+	ssl << hex << strlRAND;
+	ssl >> lRAND;
+	mRAND.RUpper(hRAND);
+	mRAND.RLower(lRAND);
+	mRANDset = true;
+}
+
+void AuthenticationParameters::KCstr(string strKC)
+{
+	assert(strKC.size() == 16);
+	stringstream ssh;
+	ssh << hex << strKC;
+	ssh >> mKC;
+	mKCset = true;
+}
+
+string AuthenticationParameters::SRESstr() const
+{
+	ostringstream os1;
+	os1.width(8);
+	os1.fill('0');
+	os1 << hex << mSRES.value();
+	return os1.str();
+}
+
+string AuthenticationParameters::RANDstr() const
+{
+	ostringstream os1;
+	os1.width(16);
+	os1.fill('0');
+	os1 << hex << mRAND.RUpper();
+	ostringstream os2;
+	os2.width(16);
+	os2.fill('0');
+	os2 << hex << mRAND.RLower();
+	ostringstream os3;
+	os3 << os1.str() << os2.str();
+	return os3.str();
+}
+
+string AuthenticationParameters::KCstr() const
+{
+	ostringstream os1;
+	os1.width(16);
+	os1.fill('0');
+	os1 << hex << mKC;
+	return os1.str();
+}
 
 
 // vim: ts=4 sw=4

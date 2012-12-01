@@ -33,8 +33,8 @@ namespace SIP {
 
 
 osip_message_t * sip_register( const char * sip_username, short timeout, short local_port, const char * local_ip, 
-const char * proxy_ip, const char * from_tag, const char * via_branch, const char * call_id, int cseq);
-
+const char * proxy_ip, const char * from_tag, const char * via_branch, const char * call_id, int cseq,
+const char *RAND, const char *IMSI, const char *SRES);
 
 
 osip_message_t * sip_message( const char * dialed_number, const char * sip_username, short local_port, const char * local_ip, const char * proxy_ip, const char * from_tag, const char * via_branch, const char * call_id, int cseq, const char* message, const char* content_type=NULL);
