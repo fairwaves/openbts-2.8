@@ -96,6 +96,10 @@ ostream& GSM::operator<<(ostream& os, L3RRMessage::MessageType val)
 			os << "System Information Type 17"; break;
 		case L3RRMessage::PagingResponse: 
 			os << "Paging Response"; break;
+		case L3RRMessage::CipheringModeCommand:
+			os << "Ciphering Command"; break;
+		case L3RRMessage::CipheringModeComplete:
+			os << "Ciphering Complete"; break;
 		case L3RRMessage::PagingRequestType1: 
 			os << "Paging Request Type 1"; break;
 		case L3RRMessage::MeasurementReport: 
@@ -147,6 +151,8 @@ L3RRMessage* GSM::L3RRFactory(L3RRMessage::MessageType MTI)
 		case L3RRMessage::AssignmentFailure: return new L3AssignmentFailure();
 		case L3RRMessage::RRStatus: return new L3RRStatus();
 		case L3RRMessage::PagingResponse: return new L3PagingResponse();
+		case L3RRMessage::CipheringModeCommand: return new L3CipheringModeCommand();
+		case L3RRMessage::CipheringModeComplete: return new L3CipheringModeComplete();
 		case L3RRMessage::ChannelModeModifyAcknowledge: return new L3ChannelModeModifyAcknowledge();
 		case L3RRMessage::ClassmarkChange: return new L3ClassmarkChange();
 		case L3RRMessage::ClassmarkEnquiry: return new L3ClassmarkEnquiry();
@@ -244,8 +250,8 @@ size_t L3PagingResponse::l2BodyLength() const
 
 void L3PagingResponse::parseBody(const L3Frame& src, size_t &rp)
 {
-	// THIS CODE IS CORRECT.  DON'T CHANGE IT. -- DAB
-	rp += 8;			// skip cipher key seq # and spare half octet
+	mCKSN.parseV(src, rp);
+	rp += 4; // skip spare half octet
 	// TREAT THIS AS LV!!
 	mClassmark.parseLV(src,rp);
 	// We only care about the mobile ID.
@@ -257,9 +263,43 @@ void L3PagingResponse::text(ostream& os) const
 	L3RRMessage::text(os);
 	os << "mobileID=(" << mMobileID << ")";
 	os << " classmark=(" << mClassmark << ")";
+	os << " CKSN=(" << mCKSN << ")";
 }
 
+void L3CipheringModeCommand::writeBody(L3Frame& dest, size_t &wp) const
+{
+	/* Ciphering Mode Command, GSM 04.08 9.1.9. */
+	mResponse.writeV(dest,wp);
+	mSetting.writeV(dest,wp);
+}
 
+void L3CipheringModeCommand::text(ostream& os) const
+{
+	L3RRMessage::text(os);
+	os << "Ciphering Settings=(" << mSetting << ")";
+	os << " Ciphering Response=(" << mResponse << ")";
+}
+
+size_t L3CipheringModeComplete::l2BodyLength() const
+{
+	size_t sum = 0;
+	// if (mHaveMobileID) sum += mMobileID.lengthTLV() ;
+	return sum;
+}
+
+ void L3CipheringModeComplete::parseBody(const L3Frame& src, size_t &rp)
+{
+	/* Ciphering Mode Complete, GSM 04.08 9.1.10 */
+	mHaveMobileID = mMobileID.parseTLV(0x17,src,rp);
+}
+
+void L3CipheringModeComplete::text(ostream& os) const
+{
+	L3RRMessage::text(os);
+	if (mHaveMobileID) {
+		os << "mobileID=(" << mHaveMobileID << ")";
+	}
+}
 
 
 void L3SystemInformationType1::writeBody(L3Frame& dest, size_t &wp) const

@@ -99,7 +99,7 @@ public:
 
 	size_t lengthV() const { return 1; }	
 	void writeV( L3Frame& dest, size_t &wp ) const;
-	void parseV(const L3Frame&, size_t&) { assert(0); }
+	void parseV(const L3Frame&, size_t&);
 	void parseV(const L3Frame&, size_t& , size_t) { assert(0); }
 	void text(std::ostream&) const;
 };
@@ -200,6 +200,12 @@ class L3RAND : public L3ProtocolElement {
 		mRUpper(wRUpper),mRLower(wRLower)
 	{ }
 
+	uint64_t RUpper() const { return mRUpper; }
+	uint64_t RLower() const { return mRLower; }
+
+	void RUpper(uint64_t wRUpper) { mRUpper = wRUpper; }
+	void RLower(uint64_t wRLower) { mRLower = wRLower; }
+
 	size_t lengthV() const { return 16; }
 	void writeV(L3Frame&, size_t&) const;
 	void parseV(const L3Frame&, size_t&) { assert(0); }
@@ -224,6 +230,7 @@ class L3SRES : public L3ProtocolElement {
 	L3SRES():mValue(0) {}
 
 	uint32_t value() const { return mValue; }
+	void value(uint32_t wValue) { mValue=wValue; }
 
 	size_t lengthV() const { return 4; }
 	void writeV(L3Frame&, size_t&) const { assert(0); }

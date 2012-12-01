@@ -113,6 +113,7 @@ class L3LocationUpdatingRequest : public L3MMMessage
 	L3MobileStationClassmark1 mClassmark;
 	L3MobileIdentity mMobileIdentity; // (LV) 1+len
 	L3LocationAreaIdentity mLAI;
+	L3CipheringKeySequenceNumber mCKSN;
 
 public:
 	L3LocationUpdatingRequest():L3MMMessage() {}
@@ -121,6 +122,8 @@ public:
 		{ return mMobileIdentity; }
 	const L3LocationAreaIdentity& LAI() const
 		{ return mLAI; }
+	const L3CipheringKeySequenceNumber cksn() const
+		{ return mCKSN; }
 
 	int MTI() const { return (int)LocationUpdatingRequest; }
 	
@@ -279,6 +282,7 @@ class L3CMServiceRequest : public L3MMMessage
 	L3MobileStationClassmark2 mClassmark;
 	L3MobileIdentity mMobileIdentity;
 	L3CMServiceType mServiceType;
+	L3CipheringKeySequenceNumber mCKSN;
 
 public:
 
@@ -293,6 +297,9 @@ public:
 
 	const L3MobileIdentity& mobileID() const
 		{ return mMobileIdentity; }
+	const L3CipheringKeySequenceNumber cksn() const
+		{ return mCKSN; }
+
 	//@}
 
 	int MTI() const { return (int)CMServiceRequest; }
@@ -315,6 +322,7 @@ class L3CMReestablishmentRequest : public L3MMMessage {
 	L3MobileIdentity mMobileID;
 	bool mHaveLAI;
 	L3LocationAreaIdentity mLAI;
+	L3CipheringKeySequenceNumber mCKSN;
 
 	public:
 
@@ -440,6 +448,8 @@ class L3AuthenticationResponse : public L3MMMessage {
 	int MTI() const { return AuthenticationResponse; }
 
 	const L3SRES& SRES() const { return mSRES; }
+
+	void setSRES(L3SRES sres) { mSRES = L3SRES(sres.value()); }
 
 	size_t l2BodyLength() const { return mSRES.lengthV(); }
 	void parseBody(const L3Frame&, size_t &rp);
