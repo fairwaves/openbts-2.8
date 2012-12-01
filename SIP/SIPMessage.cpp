@@ -170,7 +170,7 @@ int openbts_message_set_rr(osip_message_t *response, osip_message_t *orig)
 	return MSG_NO_ERROR;
 }
 
-osip_message_t * SIP::sip_register( const char * sip_username, short timeout, short wlocal_port, const char * local_ip, const char * proxy_ip, const char * from_tag, const char * via_branch, const char * call_id, int cseq) {
+osip_message_t * SIP::sip_register( const char * sip_username, short timeout, short wlocal_port, const char * local_ip, const char * proxy_ip, const char * from_tag, const char * via_branch, const char * call_id, int cseq, const char *RAND, const char *IMSI, const char *SRES) {
 
  	char local_port[10];
 	sprintf(local_port,"%i",wlocal_port);	
@@ -249,6 +249,17 @@ osip_message_t * SIP::sip_register( const char * sip_username, short timeout, sh
 
 	// add contact
 	osip_list_add(&request->contacts, con, -1);
+
+	if (SRES) {
+		// add authentication
+		osip_authorization_t *auth;
+		osip_authorization_init(&auth);
+		osip_authorization_set_auth_type(auth, osip_strdup("Digest"));
+		osip_authorization_set_nonce(auth, osip_strdup(RAND));
+		osip_authorization_set_uri(auth, osip_strdup(IMSI));
+		osip_authorization_set_response(auth, osip_strdup(SRES));
+		osip_list_add(&request->authorizations, auth, -1);
+	}
 
 	return request;	
 }

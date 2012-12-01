@@ -40,6 +40,11 @@
 #include <Sockets.h>
 #include <Globals.h>
 
+#include <MobilityManagement.h>
+
+namespace Control {
+class AuthenticationParameters;
+};
 
 namespace SIP {
 
@@ -178,14 +183,15 @@ public:
 		Can throw SIPTimeout().
 		@return True on success.
 	*/
-	bool Register(Method wMethod=SIPRegister);	
+	bool Register(Method wMethod, Control::AuthenticationParameters& authParams);
 
 	/**
 		Send sip unregister and look at return msg.
 		Can throw SIPTimeout().
 		@return True on success.
 	*/
-	bool unregister() { return (Register(SIPUnregister)); };
+	bool unregister(Control::AuthenticationParameters& authParams)
+		{ return Register(SIPUnregister, authParams); }
 
 	//@}
 

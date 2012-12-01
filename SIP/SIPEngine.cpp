@@ -314,7 +314,26 @@ void SIPEngine::writePrivateHeaders(osip_message_t *msg, const GSM::LogicalChann
 
 }
 
-bool SIPEngine::Register( Method wMethod )
+bool osip_extract(osip_message_t *msg, string &data, unsigned &CKSN, unsigned length)
+{
+	osip_authentication_info_t * auth_info;
+	osip_message_get_authentication_info(msg, 0, &auth_info);
+	bool success = false;
+	if (auth_info)
+	{
+		char * qop = osip_authentication_info_get_qop_options(auth_info);
+		char * key = osip_authentication_info_get_rspauth(auth_info);
+		if (qop||key)
+		{
+			CKSN = atoi(qop);
+			data = string(key + 1, length);
+			success = true;
+		}
+	}
+	return success;
+}
+
+bool SIPEngine::Register( Method wMethod, Control::AuthenticationParameters& authParams )
 {
 	LOG(INFO) << "user " << mSIPUsername << " state " << mState << " " << wMethod << " callID " << mCallID;
 
@@ -330,18 +349,33 @@ bool SIPEngine::Register( Method wMethod )
 	// is expiration period.
 	osip_message_t * reg; 
 	if (wMethod == SIPRegister ){
-		reg = sip_register( mSIPUsername.c_str(), 
-			60*gConfig.getNum("SIP.RegistrationPeriod"),
-			mSIPPort, mSIPIP.c_str(), 
-			mProxyIP.c_str(), mMyTag.c_str(), 
-			mViaBranch.c_str(), mCallID.c_str(), mCSeq
-		); 
+		if (authParams.isRANDset()){
+			reg = sip_register( mSIPUsername.c_str(), 
+				gConfig.getNum("SIP.RegistrationPeriod"),
+				mSIPPort, mSIPIP.c_str(), 
+				mProxyIP.c_str(), mMyTag.c_str(), 
+				mViaBranch.c_str(), mCallID.c_str(), mCSeq,
+				(authParams.RANDstr()).c_str(),
+				authParams.mobileID().digits(),
+				(authParams.SRESstr()).c_str()
+			);
+		}
+		else {
+			reg = sip_register( mSIPUsername.c_str(), 
+				gConfig.getNum("SIP.RegistrationPeriod"),
+				mSIPPort, mSIPIP.c_str(), 
+				mProxyIP.c_str(), mMyTag.c_str(), 
+				mViaBranch.c_str(), mCallID.c_str(), mCSeq,
+				NULL, NULL, NULL
+			);
+		}
 	} else if (wMethod == SIPUnregister ) {
 		reg = sip_register( mSIPUsername.c_str(), 
 			0,
 			mSIPPort, mSIPIP.c_str(), 
 			mProxyIP.c_str(), mMyTag.c_str(), 
-			mViaBranch.c_str(), mCallID.c_str(), mCSeq
+			mViaBranch.c_str(), mCallID.c_str(), mCSeq,
+			NULL, NULL, NULL
 		);
 	} else { assert(0); }
 
@@ -369,15 +403,35 @@ bool SIPEngine::Register( Method wMethod )
 		assert(msg);
 		int status = msg->status_code;
 		LOG(INFO) << "received status " << msg->status_code << " " << msg->reason_phrase;
+		unsigned CKSN;
+		string KC, RAND;
 		// specific status
 		if (status==200) {
+			if(osip_extract(msg, KC, CKSN, 16)) {
+				if (CKSN < 8) {
+					authParams.CKSN(CKSN);
+					authParams.KCstr(KC);
+					LOG(INFO) << "REGISTER success: CKSN = " << CKSN << " KC = " << KC;
+				}
+			}
 			LOG(INFO) << "REGISTER success";
 			success = true;
 			break;
 		}
 		if (status==401) {
-			LOG(INFO) << "REGISTER fail -- unauthorized";
-			break;
+			if(osip_extract(msg, RAND, CKSN, 32)) {
+				if (CKSN < 8) {
+					// if rand is included on 401 unauthorized, then the challenge-response game is afoot
+					authParams.CKSN(CKSN);
+					authParams.RANDstr(RAND);
+					LOG(INFO) << "REGISTER CKSN = " << CKSN << " challenge RAND = " << RAND;
+					success = true;
+					break;
+				}
+			} else {
+				LOG(INFO) << "REGISTER fail -- unauthorized";
+				break;
+			}
 		}
 		if (status==404) {
 			LOG(INFO) << "REGISTER fail -- not found";
