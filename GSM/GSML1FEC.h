@@ -112,6 +112,12 @@ class L1Encoder {
 	bool mActive;					///< true between open() and close()
 	//@}
 
+	/**@ Cipher state */
+	//@{
+	uint8_t mKc[8];					///< current Kc
+	unsigned mCipherID;				///< current cipher id
+	//@}
+
 	ViterbiR2O4 mVCoder;	///< nearly all GSM channels use the same convolutional code
 
 	char mDescriptiveString[100];
@@ -174,6 +180,13 @@ class L1Encoder {
 
 	const char* descriptiveString() const { return mDescriptiveString; }
 
+	/**@name Cipher support */
+	//@{
+	void setKc(uint8_t * Kc_key) { memcpy(mKc, Kc_key, 8); }
+	void setCipherID(unsigned cipherID) { mCipherID = cipherID; }
+	unsigned getCipherID() const { return mCipherID; }
+	//@}
+
 	protected:
 
 	/** Roll write times forward to the next positions. */
@@ -196,6 +209,9 @@ class L1Encoder {
 		The default is a dummy burst.
 	*/
 	virtual void sendIdleFill();
+
+	/** Encrypt given burst in-place */
+	void encrypt(BitVector &burst, uint32_t FN) const;
 
 };
 
@@ -238,6 +254,12 @@ class L1Decoder {
 	unsigned mTN;					///< timeslot number 
 	const TDMAMapping& mMapping;	///< demux parameters
 	L1FEC* mParent;			///< a containing L1 processor, if any
+	//@}
+
+	/**@ Cipher state */
+	//@{
+	uint8_t mKc[8];					///< current Kc
+	unsigned mCipherID;				///< current cipher id
 	//@}
 
 	ViterbiR2O4 mVCoder;	///< nearly all GSM channels use the same convolutional code
@@ -313,6 +335,13 @@ class L1Decoder {
 	TypeAndOffset typeAndOffset() const;	///< this comes from mMapping
 	//@}
 
+	/**@name Cipher support */
+	//@{
+	void setKc(uint8_t * Kc_key) { memcpy(mKc, Kc_key, 8); }
+	void setCipherID(unsigned cipherID) { mCipherID = cipherID; }
+	unsigned getCipherID() const { return mCipherID; }
+	//@}
+
 
 	protected:
 
@@ -330,6 +359,10 @@ class L1Decoder {
 	void countGoodFrame();
 
 	void countBadFrame();
+
+	/* Decrypt burst in-place */
+	void decrypt(SoftVector &burst, uint32_t FN) const;
+
 };
 
 
@@ -413,6 +446,22 @@ class L1FEC {
 	const char* descriptiveString() const
 		{ assert(mEncoder); return mEncoder->descriptiveString(); }
 
+	void setKc(uint8_t *Kc) {
+		assert(mEncoder); mEncoder->setKc(Kc);
+		assert(mDecoder); mDecoder->setKc(Kc);
+	}
+
+	unsigned getEncCipherID() const 
+		{ assert(mEncoder); return mEncoder->getCipherID(); }
+
+	unsigned getDecCipherID() const 
+		{ assert(mDecoder); return mDecoder->getCipherID(); }
+
+	void setEncCipherID(unsigned cipherID)
+		{ assert(mEncoder); mEncoder->setCipherID(cipherID); }
+
+	void setDecCipherID(unsigned cipherID)
+		{ assert(mDecoder); return mDecoder->setCipherID(cipherID); }
 	//@}
 
 

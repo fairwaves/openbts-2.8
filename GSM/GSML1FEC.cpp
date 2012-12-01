@@ -24,7 +24,10 @@
 */
 
 
-
+extern "C" {
+#include <osmocom/core/utils.h>
+#include <osmocom/gsm/a5.h>
+}
 #include "GSML1FEC.h"
 #include "GSMCommon.h"
 #include "GSMSAPMux.h"
@@ -230,6 +233,7 @@ void L1Encoder::open()
 	if (!mRunning) start();
 	mTotalBursts=0;
 	mActive = true;
+	mCipherID = 0;
 	resync();
 }
 
@@ -313,6 +317,16 @@ unsigned L1Encoder::ARFCN() const
 }
 
 
+void L1Encoder::encrypt(BitVector &burst, uint32_t FN) const
+{
+	if (mCipherID > 0) {
+		ubit_t ks[114];
+		osmo_a5(mCipherID, mKc, FN, ks, NULL);
+		unsigned e = burst.xor_apply(ks, 114);
+		if (e) LOG(ERR) << "Length mismatch while applying gamma: " << e;
+	}
+}
+
 
 unsigned L1Decoder::ARFCN() const
 {
@@ -336,6 +350,7 @@ void L1Decoder::open()
 	mT3109.reset();
 	mT3101.set();
 	mActive = true;
+	mCipherID = 0;
 }
 
 
@@ -398,7 +413,15 @@ void L1Decoder::countBadFrame()
 	OBJLOG(DEBUG) <<"L1Decoder FER=" << mFER;
 }
 
-
+void L1Decoder::decrypt(SoftVector &burst, uint32_t FN) const
+{
+	if (mCipherID > 0) {
+		ubit_t ks[114];
+		osmo_a5(mCipherID, mKc, FN, NULL, ks);
+		unsigned e = burst.xor_apply(ks, 114);
+		if (e) LOG(ERR) << "Length mismatch while applying gamma: " << e;
+	}
+}
 
 
 void L1FEC::downstream(ARFCNManager* radio)
@@ -588,6 +611,9 @@ bool XCCHL1Decoder::processBurst(const RxBurst& inBurst)
 	// If the burst index is 0, save the time
 	if (B==0)
 		mReadTime = inBurst.time();
+
+	// Decrypt the burst
+	decrypt(mI[B], inBurst.time().FN());
 
 	// If the burst index is 3, then this is the last burst in the L2 frame.
 	// Return true to indicate that we are ready to deinterleave.
@@ -881,6 +907,8 @@ void XCCHL1Encoder::transmit()
 
 	for (int B=0; B<4; B++) {
 		mBurst.time(mNextWriteTime);
+		// Encrypt the burst
+		encrypt(mI[B], mNextWriteTime.FN());
 		// Copy in the "encrypted" bits, GSM 05.03 4.1.5, 05.02 5.2.3.
 		OBJLOG(DEBUG) << "XCCHL1Encoder mI["<<B<<"]=" << mI[B];
 		mI[B].segment(0,57).copyToSegment(mBurst,3);
@@ -1094,6 +1122,9 @@ bool TCHFACCHL1Decoder::processBurst( const RxBurst& inBurst)
 	// GSM 05.03 3.1.4
 	inBurst.data1().copyToSegment(mI[B],0);
 	inBurst.data2().copyToSegment(mI[B],57);
+
+	// Decrypt the burst
+	decrypt(mI[B], inBurst.time().FN());
 
 	// Every 4th frame is the start of a new block.
 	// So if this isn't a "4th" frame, return now.
@@ -1397,6 +1428,8 @@ void TCHFACCHL1Encoder::dispatch()
 	for (int B=0; B<4; B++) {
 		// set TDMA position
 		mBurst.time(mNextWriteTime);
+		// Encrypt the burst
+		encrypt(mI[B+mOffset], mNextWriteTime.FN());
 		// copy in the bits
 		mI[B+mOffset].segment(0,57).copyToSegment(mBurst,3);
 		mI[B+mOffset].segment(57,57).copyToSegment(mBurst,88);

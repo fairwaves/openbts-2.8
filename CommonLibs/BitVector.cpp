@@ -163,6 +163,15 @@ void BitVector::invert()
 }
 
 
+unsigned BitVector::xor_apply(uint8_t * gamma, size_t len)
+{
+	if (len != size()) return 1;
+	for (size_t i = 0; i < size(); i++) {
+		if (gamma[i] > 1) return gamma[i];
+		mStart[i] ^= gamma[i];
+	}
+	return 0;
+}
 
 
 void BitVector::reverse8()
@@ -446,6 +455,17 @@ BitVector SoftVector::sliced() const
 	return newSig;
 }
 
+
+unsigned SoftVector::xor_apply(uint8_t * gamma, size_t len)
+{
+	if (len != size()) return 1;
+	for (size_t i = 0; i < size(); i++) {
+		if (gamma[i] > 1) return gamma[i];
+		// soft-bit inversion
+		if (gamma[i]) mStart[i] = 1.0F - mStart[i]; 
+	}
+	return 0;
+}
 
 
 void SoftVector::decode(ViterbiR2O4 &decoder, BitVector& target) const
