@@ -136,7 +136,56 @@ class L3CellSelectionParameters : public L3ProtocolElement {
 
 };
 
+/** Cipher Mode Settings, GSM 04.08 10.5.2.9 */
+class L3CipheringSettings : public L3ProtocolElement {
 
+	private:
+
+	unsigned mSC;
+	unsigned mAlgorithmIdentifier;
+
+	public:
+
+	L3CipheringSettings()
+		:L3ProtocolElement()
+	{ mSC = 0; }
+	L3CipheringSettings(bool ciphering, unsigned a5_version)
+		:L3ProtocolElement()
+	{
+		mSC = ciphering;                       // Start Ciphering
+		mAlgorithmIdentifier = a5_version - 1; // A5/? Algorithm, counting from 0
+	}
+
+	size_t lengthV() const { return 1; }
+	void writeV(L3Frame& dest, size_t &wp) const;
+	void parseV(const L3Frame&, size_t&) { assert(0); }
+	void parseV(const L3Frame&, size_t& , size_t) { assert(0); }
+	void text(std::ostream&) const;
+
+};
+
+/** Cipher Mode Response, GSM 04.08 10.5.2.10 */
+class L3CipheringResponse : public L3ProtocolElement {
+
+	private:
+
+	unsigned mCR;
+
+	public:
+
+	/* FixMe When we Call for the IMEISV, Ciphering Fails */
+	L3CipheringResponse()
+		:L3ProtocolElement()
+	{ mCR = 0; } /* Send Cipher Mode Complete without IMEISV */
+
+
+	size_t lengthV() const { return 1; }
+	void writeV(L3Frame& dest, size_t &wp) const;
+	void parseV(const L3Frame&, size_t&) { assert(0); }
+	void parseV(const L3Frame&, size_t& , size_t) { assert(0); }
+	void text(std::ostream&) const;
+
+};
 
 
 /** Control Channel Description, GSM 04.08 10.5.2.11 */

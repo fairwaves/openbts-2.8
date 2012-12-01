@@ -72,6 +72,10 @@ void L3RejectCause::writeV( L3Frame& dest, size_t &wp ) const
 	dest.writeField(wp, mRejectCause, 8);
 }
 
+void L3RejectCause::parseV(const L3Frame & src, size_t & rp)
+{
+	mRejectCause = src.readField(rp, 8);
+}
 
 void L3RejectCause::text(ostream& os) const
 {	

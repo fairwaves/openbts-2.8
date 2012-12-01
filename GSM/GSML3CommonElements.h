@@ -116,6 +116,7 @@ class L3MobileIdentity : public L3ProtocolElement {
 	MobileIDType mType;					///< IMSI, TMSI, or IMEI?
 	char mDigits[16];					///< GSM 03.03 2.2 limits the IMSI or IMEI to 15 digits.
 	uint32_t mTMSI;						///< GSM 03.03 2.4 specifies the TMSI as 32 bits
+	uint64_t mKC;
 
 	public:
 
@@ -142,6 +143,8 @@ class L3MobileIdentity : public L3ProtocolElement {
 	MobileIDType type() const { return mType; }
 	const char* digits() const { assert(mType!=TMSIType); return mDigits; }
 	unsigned int TMSI() const { assert(mType==TMSIType); return mTMSI; }
+	uint64_t KC() { return mKC; }
+	void KC(uint64_t KC) { mKC = KC; }
 	//@}
 
 	/** Comparison. */
@@ -264,13 +267,16 @@ class L3CipheringKeySequenceNumber : public L3ProtocolElement {
 
 	public:
 
-	L3CipheringKeySequenceNumber(unsigned wCIValue):
+	L3CipheringKeySequenceNumber(unsigned wCIValue = 7):
 		mCIValue(wCIValue)
 	{ }
 
-	size_t lengthV() const { return 0; }
+	void CIValue(unsigned wCIValue) 
+		{ mCIValue = wCIValue; }
+
+	size_t lengthV() const { return 4; }
 	void writeV(L3Frame&, size_t&) const;
-	void parseV(const L3Frame &, size_t &) { assert(0); }
+	void parseV(const L3Frame &, size_t &);
 	void parseV(const L3Frame&, size_t&, size_t) { assert(0); }
 	void text(std::ostream&) const;
 };
