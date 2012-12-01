@@ -28,6 +28,10 @@
 
 
 
+extern "C" {
+#include <osmocom/core/utils.h>
+}
+
 #include "GSML3RRElements.h"
 #include "GSML3Message.h"
 #include "GSML3RRMessages.h"
@@ -61,6 +65,69 @@ void LogicalChannel::open()
 		LOG(WARNING) << "flushing stray transaction " << *trans;
 		// FIXME -- Shouldn't we be deleting these?
 	}
+}
+
+
+bool LogicalChannel::setKc(const char * key)
+{
+	uint8_t Kc[8];
+	if (!mL1) return false;
+	if(osmo_hexparse(key, Kc, 8) != 8) return false;
+	mL1->setKc(Kc);
+	if (mSACCH) mSACCH->setKc(key);
+	return true;
+}
+
+
+unsigned LogicalChannel::isEncrypting() const
+{
+	if (mL1) {
+		return mL1->getEncCipherID();
+	}
+	else {
+		return 0;
+	}
+}
+
+
+unsigned LogicalChannel::isDecrypting() const
+{
+	if (mL1) {
+		return mL1->getDecCipherID();
+	}
+	else {
+		return 0;
+	}
+}
+
+
+void LogicalChannel::activateEncryption(unsigned cipherID)
+{
+	if (mL1) {
+		if (mL1->getEncCipherID() == 0) {
+			LOG(DEBUG) << "Activate Encryption on "<< mL1->descriptiveString();
+			mL1->setEncCipherID(cipherID);
+		}
+		else {
+			LOG(DEBUG) << "Encryption is already activated on " << mL1->descriptiveString();
+		}
+	}
+	if (mSACCH) ((LogicalChannel*)mSACCH)->activateEncryption(cipherID);
+}
+
+
+void LogicalChannel::activateDecryption(unsigned cipherID)
+{
+	if (mL1) {
+		if (mL1->getDecCipherID() == 0) {
+			LOG(DEBUG) << "Activate Dencryption on "<< mL1->descriptiveString();
+			mL1->setDecCipherID(cipherID);
+		}
+		else {
+			LOG(DEBUG) << "Decryption is already activated on " << mL1->descriptiveString();
+		}
+	}
+	if (mSACCH) ((LogicalChannel*)mSACCH)->activateDecryption(cipherID);
 }
 
 

@@ -205,6 +205,21 @@ public:
 	/** Return true if the channel is active. */
 	bool active() const { assert(mL1); return mL1->active(); }
 
+	/** Set Kc for L1 */
+	bool setKc(const char * key);
+
+	/** Return CipherID or 0 if encryption is not activated. */
+	unsigned isEncrypting() const;
+
+	/** Return CipherID or 0 if decryption is not activated. */
+	unsigned isDecrypting() const;
+
+	/** Activate encryption, use A5/1 by default. */
+	void activateEncryption(unsigned cipherID = 1);
+
+	/** Activate decryption, use A5/1 by default. */
+	void activateDecryption(unsigned cipherID = 1);
+
 	/** The TDMA parameters for the transmit side. */
 	const TDMAMapping& txMapping() const { assert(mL1); return mL1->txMapping(); }
 
