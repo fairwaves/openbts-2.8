@@ -377,6 +377,37 @@ int sendsms(int argc, char** argv, ostream& os)
 	return SUCCESS;
 }
 
+/** Submit an SMS for delivery to an IMSI. */
+int sendsmspdu(int argc, char** argv, ostream& os)
+{
+	if (argc<4) return BAD_NUM_ARGS;
+
+	char *IMSI = argv[1];
+	char *srcAddr = argv[2];
+	string rest = "";
+	for (int i=3; i<argc; i++) rest = rest + argv[i]; //+ " ";
+	const char *txtBuf = rest.c_str();
+
+	if (!isIMSI(IMSI)) {
+		os << "Invalid IMSI. Enter 15 digits only.";
+		return BAD_VALUE;
+	}
+
+	Control::TransactionEntry *transaction = new Control::TransactionEntry(
+		gConfig.getStr("SIP.Proxy.SMS").c_str(),
+		GSM::L3MobileIdentity(IMSI),
+		NULL,
+		GSM::L3CMServiceType::MobileTerminatedShortMessage,
+		GSM::L3CallingPartyBCDNumber(srcAddr),
+		GSM::Paging,
+		txtBuf);
+	transaction->messageType("application/vnd.3gpp.sms");
+	Control::initiateMTTransaction(transaction,GSM::SDCCHType,30000);
+	os << "message submitted for delivery" << endl;
+	return SUCCESS;
+}
+
+
 /** DEBUGGING: Sends a special sms that triggers a RRLP message to an IMSI. */
 int sendrrlp(int argc, char** argv, ostream& os)
 {
@@ -780,6 +811,7 @@ void Parser::addCommands()
 	addCommand("exit", exit_function, "[wait] -- exit the application, either immediately, or waiting for existing calls to clear with a timeout in seconds");
 	addCommand("tmsis", tmsis, "[\"clear\"] or [\"dump\" filename] -- print/clear the TMSI table or dump it to a file.");
 	addCommand("sendsms", sendsms, "IMSI src# message... -- send direct SMS to IMSI, addressed from source number src#.");
+	addCommand("sendsmspdu", sendsmspdu, "IMSI src# PDU message... -- send PDU SMS to IMSI, addressed from source number src#.");
 	addCommand("sendsimple", sendsimple, "IMSI src# message... -- send SMS to IMSI via SIP interface, addressed from source number src#.");
 	//apparently non-function now -kurtis
 	//addCommand("sendrrlp", sendrrlp, "<IMSI> <hexstring> -- send RRLP message <hexstring> to <IMSI>.");
