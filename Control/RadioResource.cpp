@@ -313,6 +313,9 @@ void Control::PagingResponseHandler(const L3PagingResponse* resp, LogicalChannel
 		case L3CMServiceType::MobileTerminatedShortMessage:
 			MTSMSController(transaction, DCCH);
 			return;
+		case L3CMServiceType::TestCall:
+			TestCall(transaction, DCCH);
+			return;
 		default:
 			// Flush stray MOC entries.
 			// There should not be any, but...

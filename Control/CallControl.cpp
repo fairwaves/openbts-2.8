@@ -1200,8 +1200,81 @@ void Control::MTCController(TransactionEntry *transaction, GSM::TCHFACCHLogicalC
 	callManagementLoop(transaction,TCH);
 }
 
+void Control::TestCall(TransactionEntry* transaction, GSM::LogicalChannel *LCH)
+{
+	assert(LCH);
+	LOG(INFO) << LCH->type() << " transaction: "<< *transaction;
 
+	// Mark the call as active.
+	transaction->GSMState(GSM::Active);
 
+	// Create and open the control port.
+	UDPSocket controlSocket(gConfig.getNum("TestCall.Port"));
+
+	// If this is a FACCH, change the mode from signaling-only to speech.
+	if (LCH->type()==GSM::FACCHType) {
+		static const GSM::L3ChannelMode mode(GSM::L3ChannelMode::SpeechV1);
+		LCH->send(GSM::L3ChannelModeModify(LCH->channelDescription(),mode));
+		GSM::L3Message *msg_ack = getMessage(LCH);
+		const GSM::L3ChannelModeModifyAcknowledge *ack =
+			dynamic_cast<GSM::L3ChannelModeModifyAcknowledge*>(msg_ack);
+		if (!ack) {
+			if (msg_ack) {
+				LOG(WARNING) << "Unexpected message " << *msg_ack;
+				delete msg_ack;
+			}
+			controlSocket.close();
+			throw UnexpectedMessage(transaction->ID());
+		}
+		// Cause 0x06 is "channel unacceptable"
+		bool modeOK = (ack->mode()==mode);
+		delete msg_ack;
+		if (!modeOK) {
+			controlSocket.close();
+			return abortAndRemoveCall(transaction,LCH,GSM::L3Cause(0x06));
+		}
+	}
+
+	// FIXME -- Somehow, the RTP ports need to be attached to the transaction.
+
+	// This loop will run or block until some outside entity writes a
+	// channel release on the socket.
+
+	LOG(WARNING) << "entering test loop";
+	while (true) {
+		// Get the outgoing message from the test call port.
+		char iBuf[MAX_UDP_LENGTH];
+		int msgLen = controlSocket.read(iBuf);
+		LOG(WARNING) << "got " << msgLen << " bytes on UDP";
+		// Send it to the handset.
+		GSM::L3Frame query(iBuf,msgLen);
+		LOG(WARNING) << "sending " << query;
+		LCH->send(query);
+		// Wait for a response.
+		// FIXME -- This should be a proper T3xxx value of some kind.
+		GSM::L3Frame* resp = LCH->recv(30000);
+		if (!resp) {
+			LOG(WARNING) << "read timeout";
+			break;
+		}
+		if (resp->primitive() != GSM::DATA) {
+			LOG(WARNING) << "unexpected primitive " << resp->primitive();
+			break;
+		}
+		LOG(WARNING) << "received " << *resp;
+		// Send response on the port.
+		unsigned char oBuf[resp->size()];
+		resp->pack(oBuf);
+		controlSocket.writeBack((char*)oBuf);
+		// Delete and close the loop.
+		delete resp;
+	}
+	controlSocket.close();
+	LOG(WARNING) << "ending";
+	LCH->send(GSM::L3ChannelRelease());
+	LCH->send(GSM::RELEASE);
+	gTransactionTable.remove(transaction);
+}
 
 
 

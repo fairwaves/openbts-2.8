@@ -622,6 +622,26 @@ int page(int argc, char **argv, ostream& os)
 	return SUCCESS;
 }
 
+int testcall(int argc, char **argv, ostream& os)
+{
+	if (argc!=3) return BAD_NUM_ARGS;
+	char *IMSI = argv[1];
+	if (strlen(IMSI)!=15) {
+		os << IMSI << " is not a valid IMSI" << endl;
+		return BAD_VALUE;
+	}
+
+	Control::TransactionEntry *transaction = new Control::TransactionEntry(
+		gConfig.getStr("SIP.Proxy.Speech").c_str(),
+		GSM::L3MobileIdentity(IMSI),
+		NULL,
+		GSM::L3CMServiceType::TestCall,
+		GSM::L3CallingPartyBCDNumber("0"),
+		GSM::Paging);
+
+	Control::initiateMTTransaction(transaction, GSM::TCHFType,1000*atoi(argv[2]));
+	return SUCCESS;
+}
 
 
 int endcall(int argc, char **argv, ostream& os)
@@ -817,6 +837,7 @@ void Parser::addCommands()
 	addCommand("alarms", alarms, "-- show latest alarms");
 	addCommand("version", version,"-- print the version string");
 	addCommand("page", page, "[IMSI time] -- dump the paging table or page the given IMSI for the given period");
+	addCommand("testcall", testcall, "IMSI time -- initiate a test call to a given IMSI with a given paging time");
 	addCommand("chans", chans, "-- report PHY status for active channels");
 	addCommand("power", power, "[minAtten maxAtten] -- report current attentuation or set min/max bounds");
         addCommand("rxgain", rxgain, "[newRxgain] -- get/set the RX gain in dB");

@@ -128,4 +128,5 @@ INSERT INTO "CONFIG" VALUES('TRX.RadioFrequencyOffset','128',1,0,'Fine-tuning ad
 INSERT INTO "CONFIG" VALUES('TRX.Timeout.Clock','10',0,1,'How long to wait during a read operation from the transceiver before giving up.');
 INSERT INTO "CONFIG" VALUES('TRX.Timeout.Start','2',0,1,'How long to wait during system startup before checking to see if the transceiver can be reached.');
 INSERT INTO "CONFIG" VALUES('TRX.TxAttenOffset','2',1,0,'Hardware-specific gain adjustment for transmitter, matched to the power amplifier, expessed as an attenuationi in dB.  Set at the factory.  Do not adjust without proper calibration.  Static.');
+INSERT INTO "CONFIG" VALUES('TestCall.Port','28670',0,0,'Port for exchanging L3 packets with the testcall feature.');
 COMMIT;
