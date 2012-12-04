@@ -193,6 +193,16 @@ GSM::TCHFACCHLogicalChannel *allocateTCH(GSM::LogicalChannel *DCCH)
 		DCCH->send(GSM::L3CMServiceReject(0x16));
 		DCCH->send(GSM::L3ChannelRelease());
 	}
+
+	if (DCCH->isEncrypting()) {
+		LOG(DEBUG) << "Activate TCH Encryption";
+		TCH->activateEncryption();
+	}
+	if (DCCH->isDecrypting()) {
+		LOG(DEBUG) << "Activate TCH Decryption";
+		TCH->activateDecryption();
+	}
+
 	return TCH;
 }
 
@@ -760,6 +770,12 @@ void Control::MOCStarter(const GSM::L3CMServiceRequest* req, GSM::LogicalChannel
 	// For now, we are assuming that the phone won't make a call if it didn't
 	// get registered.
 
+	if (gConfig.getNum("GSM.Encryption")) {
+		AuthenticationParameters authParams(mobileID);
+		registerIMSI(authParams, LCH);
+		authenticate(authParams, LCH);
+	}
+
 	// Allocate a TCH for the call, if we don't have it already.
 	GSM::TCHFACCHLogicalChannel *TCH = NULL;
 	if (!veryEarly) {
@@ -770,8 +786,13 @@ void Control::MOCStarter(const GSM::L3CMServiceRequest* req, GSM::LogicalChannel
 	}
 
 	// Let the phone know we're going ahead with the transaction.
-	LOG(INFO) << "sending CMServiceAccept";
-	LCH->send(GSM::L3CMServiceAccept());
+	if (LCH->isDecrypting()) {
+		LOG(INFO) << "Decryption ACTIVE for:" << mobileID << " CMServiceAccept NOT sent, because CipherModeCommand implies it.";
+	}
+	else {
+		LOG(INFO) << "Decryption NOT active for: " << mobileID << " Sending CMServiceAccept";
+		LCH->send(GSM::L3CMServiceAccept());
+	}
 
 	// Get the Setup message.
 	// GSM 04.08 5.2.1.2
@@ -1050,6 +1071,12 @@ void Control::MTCStarter(TransactionEntry *transaction, GSM::LogicalChannel *LCH
 	// processed the INVITE that started this call.
 	unsigned L3TI = transaction->L3TI();
 	assert(L3TI<7);
+
+	if (gConfig.getNum("GSM.Encryption")) {
+		AuthenticationParameters authParams(transaction->subscriber());
+		registerIMSI(authParams, LCH);
+		authenticate(authParams, LCH);
+	}
 
 	// GSM 04.08 5.2.2.1
 	LOG(INFO) << "sending GSM Setup to call " << transaction->calling();
