@@ -669,9 +669,9 @@ signalVector *modulateBurst(const BitVector &wBurst,
 			    int guardPeriodLength,
 			    int samplesPerSymbol)
 {
-  int burstSize = samplesPerSymbol*(wBurst.size()+guardPeriodLength);
-  signalVector modBurst(burstSize);
-  signalVector modBurstC1(burstSize);
+  int burstSize = samplesPerSymbol*(wBurst.size()+guardPeriodLength-2);
+  signalVector modBurst(burstSize + 2 * samplesPerSymbol);
+  signalVector modBurstC1(burstSize + 2 * samplesPerSymbol);
 
   modBurst.isRealOnly(true);
   modBurst.fill(0.0);
@@ -695,10 +695,17 @@ signalVector *modulateBurst(const BitVector &wBurst,
   }
 #else
   // if wBurst are the raw bits
+
+  // Assume '1' for differential beginning/end bits
+  *modBurstItr = 2.0*(0x01 & 0x01)-1.0;
+  modBurstItr += samplesPerSymbol;
+
   for (unsigned int i = 0; i < wBurst.size(); i++) {
     *modBurstItr = 2.0*(wBurst[i] & 0x01)-1.0;
     modBurstItr += samplesPerSymbol;
   }
+
+  *modBurstItr = 2.0*(0x01 & 0x01)-1.0;
 
   // shift up pi/2
   // ignore starting phase, since spec allows for discontinuous phase
@@ -706,11 +713,17 @@ signalVector *modulateBurst(const BitVector &wBurst,
 #endif
   modBurst.isRealOnly(false);
 
-  // Generate C1 phase coefficients
+  // Assume '1' for all start states 
   modBurstItr = modBurst.begin();
   modBurstItr += samplesPerSymbol * 2;
   modBurstC1Itr += samplesPerSymbol * 2;
 
+  float phase = 2.0*((0x01 & 0x01) ^ (0x01 & 0x01)) -1.0;
+  *modBurstC1Itr = *modBurstItr * Complex<float>(0, phase);
+  modBurstItr += samplesPerSymbol;
+  modBurstC1Itr += samplesPerSymbol;
+
+  // Generate C1 phase coefficients
   for (unsigned int i = 2; i < wBurst.size(); i++) {
     float phase = 2.0*((wBurst[i-1] & 0x01) ^ (wBurst[i-2] & 0x01)) -1.0;
     *modBurstC1Itr = *modBurstItr * Complex<float>(0, phase);
@@ -718,6 +731,10 @@ signalVector *modulateBurst(const BitVector &wBurst,
     modBurstItr += samplesPerSymbol;
     modBurstC1Itr += samplesPerSymbol;
   }
+
+  int i = wBurst.size();
+  phase = 2.0*((wBurst[i-1] & 0x01) ^ (wBurst[i-2] & 0x01)) -1.0;
+  *modBurstC1Itr = *modBurstItr * Complex<float>(0, phase);
 
   // filter with primary C0 and second C1 pulse shapes
   signalVector *shapedBurst = convolve(&modBurst,&gsmPulse,NULL,START_ONLY);
@@ -728,6 +745,24 @@ signalVector *modulateBurst(const BitVector &wBurst,
   modBurstC1Itr = shapedBurst2->begin();
   for (unsigned int i = 0; i < shapedBurst->size(); i++ ) {
     *modBurstItr++ += *modBurstC1Itr++;
+  }
+
+  // ramp up shaping mask 
+  if (samplesPerSymbol == 4) {
+    modBurstItr = shapedBurst->begin();
+    *modBurstItr++ *= 0.0;
+    *modBurstItr++ *= 0.0;
+    *modBurstItr++ *= 0.0;
+    *modBurstItr++ *= 0.0;
+    *modBurstItr++ *= 0.0;
+    *modBurstItr++ *= 0.1;
+    *modBurstItr++ *= 0.3;
+    *modBurstItr++ *= 0.5;
+    *modBurstItr++ *= 0.6;
+    *modBurstItr++ *= 0.7;
+    *modBurstItr++ *= 0.8;
+    *modBurstItr++ *= 0.9;
+    *modBurstItr++ *= 0.9;
   }
 
   delete shapedBurst2;
