@@ -55,7 +55,7 @@ const float tx_ampl = .3;
 #ifdef RESAMPLE
 const double rx_smpl_offset = .00005;
 #else
-const double rx_smpl_offset = 9.4457e-5; 
+const double rx_smpl_offset = 4.1904e-5; 
 #endif
 
 static TIMESTAMP init_rd_ts = 0;
