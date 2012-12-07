@@ -663,7 +663,33 @@ bool vectorSlicer(signalVector *x)
   }
   return true;
 }
-  
+
+signalVector *modulateBurstBasic(const BitVector &wBurst,
+				 const signalVector &gsmPulse,
+				 int guardPeriodLength,
+				 int samplesPerSymbol)
+{
+  int burstSize = samplesPerSymbol*(wBurst.size()+guardPeriodLength);
+  signalVector modBurst(burstSize);
+
+  modBurst.isRealOnly(true);
+  modBurst.fill(0.0);
+  signalVector::iterator modBurstItr = modBurst.begin();
+
+  for (unsigned int i = 0; i < wBurst.size(); i++) {
+    *modBurstItr = 2.0*(wBurst[i] & 0x01)-1.0;
+    modBurstItr += samplesPerSymbol;
+  }
+
+  // shift up pi/2
+  // ignore starting phase, since spec allows for discontinuous phase
+  GMSKRotate(modBurst);
+  modBurst.isRealOnly(false);
+
+  signalVector *shapedBurst = convolve(&modBurst,&gsmPulse,NULL,NO_DELAY);
+
+  return shapedBurst;
+}  
 signalVector *modulateBurst(const BitVector &wBurst,
 			    const signalVector &gsmPulse,
 			    int guardPeriodLength,
@@ -1010,11 +1036,11 @@ bool generateMidamble(signalVector &gsmPulse,
   *(emptyPulse.begin()) = 1.0;
 
   // only use middle 16 bits of each TSC
-  signalVector *middleMidamble = modulateBurst(gTrainingSequence[TSC].segment(5,16),
+  signalVector *middleMidamble = modulateBurstBasic(gTrainingSequence[TSC].segment(5,16),
 					 emptyPulse,
 					 0,
 					 samplesPerSymbol);
-  signalVector *midamble = modulateBurst(gTrainingSequence[TSC],
+  signalVector *midamble = modulateBurstBasic(gTrainingSequence[TSC],
                                          gsmPulse,
                                          0,
                                          samplesPerSymbol);
@@ -1060,7 +1086,7 @@ bool generateRACHSequence(signalVector &gsmPulse,
     if (gRACHSequence->sequenceReversedConjugated!=NULL) delete gRACHSequence->sequenceReversedConjugated;
   }
 
-  signalVector *RACHSeq = modulateBurst(gRACHSynchSequence,
+  signalVector *RACHSeq = modulateBurstBasic(gRACHSynchSequence,
 					gsmPulse,
 					0,
 					samplesPerSymbol);
