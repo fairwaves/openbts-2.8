@@ -207,9 +207,22 @@ void Control::MOSMSController(const GSM::L3CMServiceRequest *req, GSM::LogicalCh
 
 	// FIXME: check provisioning
 
+	if (gConfig.getNum("GSM.Authentication")||gConfig.getNum("GSM.Encryption")) {
+		AuthenticationParameters authParams(mobileID);
+		registerIMSI(authParams, LCH);
+		authenticate(authParams, LCH);
+	}
+
 	// Let the phone know we're going ahead with the transaction.
-	LOG(INFO) << "sending CMServiceAccept";
-	LCH->send(GSM::L3CMServiceAccept());
+	if (LCH->isDecrypting()) {
+		LOG(INFO) << "Decryption ACTIVE for:" << mobileID << " CMServiceAccept NOT sent, because CipherModeCommand implies it.";
+	}
+	else {
+		LOG(INFO) << "Decryption NOT active for: " << mobileID << " Sending CMServiceAccept";
+		LCH->send(GSM::L3CMServiceAccept());
+	}
+
+
 	// Wait for SAP3 to connect.
 	// The first read on SAP3 is the ESTABLISH primitive.
 	delete getFrameSMS(LCH,GSM::ESTABLISH);
@@ -311,6 +324,7 @@ void Control::MOSMSController(const GSM::L3CMServiceRequest *req, GSM::LogicalCh
 
 bool Control::deliverSMSToMS(const char *callingPartyDigits, const char* message, const char* contentType, unsigned L3TI, GSM::LogicalChannel *LCH)
 {
+
 	if (!LCH->multiframeMode(3)) {
 		// Start ABM in SAP3.
 		LCH->send(GSM::ESTABLISH,3);
@@ -487,6 +501,12 @@ void Control::MTSMSController(TransactionEntry *transaction, GSM::LogicalChannel
 		if(!sendRRLP(transaction->subscriber(), LCH)){
 	  		LOG(INFO) << "RRLP request failed";
 		}
+	}
+
+	if (gConfig.getNum("GSM.Authentication")||gConfig.getNum("GSM.Encryption")) {
+		AuthenticationParameters authParams(transaction->subscriber());
+		registerIMSI(authParams, LCH);
+		authenticate(authParams, LCH);
 	}
 
 	bool success = deliverSMSToMS(transaction->calling().digits(),transaction->message(),
