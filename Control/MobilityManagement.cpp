@@ -177,7 +177,7 @@ void Control::LocationUpdatingController(const L3LocationUpdatingRequest* lur, L
 	AuthenticationParameters authParams(mobileID);
 	success = registerIMSI(authParams, DCCH);
 	
-	if (success && (gConfig.getNum("GSM.Encryption")))
+	if (success && (gConfig.getNum("GSM.Authentication")||gConfig.getNum("GSM.Encryption")))
 	{
 		success = authenticate(authParams, DCCH);
 	}
@@ -366,7 +366,9 @@ bool Control::authenticate (AuthenticationParameters& authParams, GSM::LogicalCh
 		
 		// verify SRES
 		if (registerIMSI(authParams, LCH)) {
-			if (authParams.isKCset()) {
+			LOG(DEBUG) << "Authenticate success for" << authParams.mobileID();
+			success = true;
+			if (authParams.isKCset() && gConfig.getNum("GSM.Encryption")) {
 				LCH->setKc(authParams.KCstr().c_str());
 				LOG(DEBUG) << "Ciphering key set for LCH , KC = " << authParams.KCstr().c_str();
 				LCH->send(GSM::L3CipheringModeCommand(1)); // FIXME: use actual a5/#
@@ -386,8 +388,6 @@ bool Control::authenticate (AuthenticationParameters& authParams, GSM::LogicalCh
 					LOG(DEBUG) << *mode_compl << "Responce received, activating encryption.";
 					LCH->activateEncryption();
 					delete mc_msg;
-					LOG(DEBUG) << "Authenticate success for" << authParams.mobileID();
-					success = true;
 				}
 			}
 		}

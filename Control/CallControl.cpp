@@ -770,7 +770,7 @@ void Control::MOCStarter(const GSM::L3CMServiceRequest* req, GSM::LogicalChannel
 	// For now, we are assuming that the phone won't make a call if it didn't
 	// get registered.
 
-	if (gConfig.getNum("GSM.Encryption")) {
+	if (gConfig.getNum("GSM.Authentication")||gConfig.getNum("GSM.Encryption")) {
 		AuthenticationParameters authParams(mobileID);
 		registerIMSI(authParams, LCH);
 		authenticate(authParams, LCH);
@@ -1072,7 +1072,7 @@ void Control::MTCStarter(TransactionEntry *transaction, GSM::LogicalChannel *LCH
 	unsigned L3TI = transaction->L3TI();
 	assert(L3TI<7);
 
-	if (gConfig.getNum("GSM.Encryption")) {
+	if (gConfig.getNum("GSM.Authentication")||gConfig.getNum("GSM.Encryption")) {
 		AuthenticationParameters authParams(transaction->subscriber());
 		registerIMSI(authParams, LCH);
 		authenticate(authParams, LCH);
