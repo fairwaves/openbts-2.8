@@ -86,6 +86,7 @@ INSERT INTO "CONFIG" VALUES('GSM.Timer.T3113','10000',0,0,'Paging timer T3113 in
 INSERT INTO "CONFIG" VALUES('GSM.Timer.T3122Max','255000',0,0,'Maximum allowed value for T3122, the RACH holdoff timer, in milliseconds.');
 INSERT INTO "CONFIG" VALUES('GSM.Timer.T3122Min','2000',0,0,'Minimum allowed value for T3122, the RACH holdoff timer, in milliseconds.');
 INSERT INTO "CONFIG" VALUES('GSM.Timer.T3212','30',0,0,'Registration timer T3212 period in minutes.  Should be a factor of 6.  Set to 0 to disable periodic registration.  Should be smaller than SIP registration period.');
+INSERT INTO "CONFIG" VALUES('GSM.Authentication','0',0,0,'1 = turn on authentication, 0 = turn off authentication');
 INSERT INTO "CONFIG" VALUES('GSM.Encryption','0',0,0,'1 = turn on encryption A5/1, 0 = turn off encryption');
 INSERT INTO "CONFIG" VALUES('Log.Alarms.Max','20',0,0,'Maximum number of alarms to remember inside the application.');
 INSERT INTO "CONFIG" VALUES('Log.Level','WARNING',0,0,'Default logging level when no other level is defined for a file.');
