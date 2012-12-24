@@ -116,14 +116,16 @@ void startTransceiver()
 
 	// Start the transceiver binary, if the path is defined.
 	// If the path is not defined, the transceiver must be started by some other process.
-    char TRXnumARFCN[16];
-    sprintf(TRXnumARFCN,"%1d", static_cast<int>(gConfig.getNum("GSM.Radio.ARFCNs")));
-	LOG(NOTICE) << "starting transceiver " << transceiverPath << " " << TRXnumARFCN;
+	char TRXnumARFCN[16];
+	char UHDargs[64];
+	sprintf(TRXnumARFCN,"%1d", static_cast<int>(gConfig.getNum("GSM.Radio.ARFCNs")));
+	sprintf(UHDargs,"%s", gConfig.getStr("GSM.Radio.UHDargs").c_str());
+	LOG(NOTICE) << "starting transceiver " << transceiverPath << " " << TRXnumARFCN << " " << UHDargs;
 	gTransceiverPid = vfork();
 	LOG_ASSERT(gTransceiverPid>=0);
 	if (gTransceiverPid==0) {
 		// Pid==0 means this is the process that starts the transceiver.
-		execlp(transceiverPath,transceiverPath,TRXnumARFCN,NULL);
+		execlp(transceiverPath,transceiverPath,TRXnumARFCN,UHDargs,NULL);
 		LOG(EMERG) << "cannot find " << transceiverPath;
 		_exit(1);
 	} else {
