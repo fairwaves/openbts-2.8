@@ -58,6 +58,8 @@ INSERT INTO "CONFIG" VALUES('GSM.RACH.MaxRetrans','1',0,0,'Maximum RACH retransm
 INSERT INTO "CONFIG" VALUES('GSM.RACH.TxInteger','14',0,0,'Parameter to spread RACH busts over time.  This is the raw parameter sent on the BCCH.  See GSM 04.08 10.5.2.29 for encoding.');
 INSERT INTO "CONFIG" VALUES('GSM.Radio.ARFCNs','1 ',1,0,'The number of ARFCNs to use.  The ARFCN set will be C0, C0+2, C0+4, etc.  Static.');
 INSERT INTO "CONFIG" VALUES('GSM.Radio.UHDargs','addr=192.168.10.2',0,0,'Arguments to pass to UHD.');
+INSERT INTO "CONFIG" VALUES('GSM.Radio.TxAntenna','',0,0,'Transmit antenna string to pass to UHD.');
+INSERT INTO "CONFIG" VALUES('GSM.Radio.RxAntenna','',0,0,'Receive antenna string to pass to UHD.');
 INSERT INTO "CONFIG" VALUES('GSM.RADIO-LINK-TIMEOUT','15',0,0,' L1 radio link timeout.  This is the raw parameter sent on the BCCH; see GSM 10.5.2.3 for encoding. Should be coordinated with T3109.');
 INSERT INTO "CONFIG" VALUES('GSM.RRLP.ACCURACY','40',0,0,'Requested accuracy of location request. K in 10(1.1**K-1). See 3GPP 03.32, sect 6.2');
 INSERT INTO "CONFIG" VALUES('GSM.RRLP.ALMANAC.REFRESH.TIME','24.0',0,0,'How often the almanac is refreshed, in hours');
