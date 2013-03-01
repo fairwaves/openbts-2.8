@@ -170,9 +170,9 @@ int openbts_message_set_rr(osip_message_t *response, osip_message_t *orig)
 	return MSG_NO_ERROR;
 }
 
-osip_message_t * SIP::sip_register( const char * sip_username, short timeout, short wlocal_port, const char * local_ip, const char * proxy_ip, const char * from_tag, const char * via_branch, const char * call_id, int cseq) {
+osip_message_t * SIP::sip_register( const char * sip_username, short timeout, short wlocal_port, const char * local_ip, const char * register_uri, const char * from_tag, const char * via_branch, const char * call_id, int cseq) {
 
- 	char local_port[10];
+	char local_port[10];
 	sprintf(local_port,"%i",wlocal_port);	
 	
 	// Message URI
@@ -183,9 +183,11 @@ osip_message_t * SIP::sip_register( const char * sip_username, short timeout, sh
 	request->sip_method = strdup("REGISTER");
 	osip_message_set_version(request, strdup("SIP/2.0"));	
 	osip_uri_init(&request->req_uri);
-	osip_uri_set_host(request->req_uri, strdup(proxy_ip));
+	osip_uri_parse(request->req_uri, register_uri);
 
-	
+	char* register_host = osip_uri_get_host(request->req_uri);
+	char* register_port = osip_uri_get_port(request->req_uri);
+
 	// VIA
 	osip_via_t * via;
 	osip_via_init(&via);
@@ -212,14 +214,16 @@ osip_message_t * SIP::sip_register( const char * sip_username, short timeout, sh
 	// FROM TAG
 	osip_from_set_tag(request->from, strdup(from_tag));
 	osip_uri_init(&request->from->url);
-	osip_uri_set_host(request->from->url, strdup(proxy_ip));
+	osip_uri_set_host(request->from->url, strdup(register_host));
+	osip_uri_set_port(request->from->url, strdup(register_port));
 	osip_uri_set_username(request->from->url, strdup(sip_username));
 
 	// TO
 	osip_to_init(&request->to);
 	osip_to_set_displayname(request->to, strdup(sip_username));
 	osip_uri_init(&request->to->url);
-	osip_uri_set_host(request->to->url, strdup(proxy_ip));
+	osip_uri_set_host(request->to->url, strdup(register_host));
+	osip_uri_set_port(request->to->url, strdup(register_port));
 	osip_uri_set_username(request->to->url, strdup(sip_username));
 	
 	// CALL ID

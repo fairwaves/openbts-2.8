@@ -101,6 +101,7 @@ private:
 	//@{
 	unsigned mSIPPort;			///< our local SIP port
 	std::string mSIPIP;			///< our SIP IP address as seen by the proxy
+	std::string mProxy;
 	std::string mProxyIP;			///< IP address of the SIP proxy
 	unsigned mProxyPort;			///< UDP port number of the SIP proxy
 	struct ::sockaddr_in mProxyAddr;	///< the ready-to-use UDP address
