@@ -317,16 +317,16 @@ void SIPEngine::writePrivateHeaders(osip_message_t *msg, const GSM::LogicalChann
 
 bool SIPEngine::Register( Method wMethod )
 {
-	std::string mRegisterBranch;
+	std::string RegisterBranch;
 	char tmp[50];
 	make_branch(tmp);
-	mRegisterBranch = tmp;
+	RegisterBranch = tmp;
 
 	mViaBranch = tmp;
 
-	std::string mRegisterURI;
-	mRegisterURI = "sip:";
-	mRegisterURI += mProxy;
+	std::string RegisterURI;
+	RegisterURI = "sip:";
+	RegisterURI += mProxy;
 
 	LOG(INFO) << "user " << mSIPUsername << " state " << mState << " " << wMethod << " callID " << mCallID;
 
@@ -345,15 +345,15 @@ bool SIPEngine::Register( Method wMethod )
 		reg = sip_register( mSIPUsername.c_str(), 
 			60*gConfig.getNum("SIP.RegistrationPeriod"),
 			mSIPPort, mSIPIP.c_str(), 
-			mRegisterURI.c_str(), mMyTag.c_str(),
-			mRegisterBranch.c_str(), mCallID.c_str(), mCSeq
+			RegisterURI.c_str(), mMyTag.c_str(),
+			RegisterBranch.c_str(), mCallID.c_str(), mCSeq
 		); 
 	} else if (wMethod == SIPUnregister ) {
 		reg = sip_register( mSIPUsername.c_str(), 
 			0,
 			mSIPPort, mSIPIP.c_str(), 
-			mRegisterURI.c_str(), mMyTag.c_str(),
-			mRegisterBranch.c_str(), mCallID.c_str(), mCSeq
+			RegisterURI.c_str(), mMyTag.c_str(),
+			RegisterBranch.c_str(), mCallID.c_str(), mCSeq
 		);
 	} else { assert(0); }
 
