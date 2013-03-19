@@ -155,7 +155,7 @@ bool handleRPDU(TransactionEntry *transaction, const RLFrame& RPDU)
 				TLSubmit submit;
 				submit.parse(data.TPDU());
 
-				address = submit.DA().digits();
+				address = submit.DA().addressValue();
 			}
 			return sendSIP(transaction, address, body.str().data(),contentType.c_str());
 		}

@@ -75,7 +75,6 @@ std::ostream& operator<<(std::ostream& os, const TLElement& msg);
 /**
 	GSM 03.40 9.1.2.5
 	This is very similar to a Q.931-style BCD number.
-	Especially since we don't support non-numeric addresses.
 */
 class TLAddress : public TLElement {
 
@@ -83,27 +82,27 @@ private:
 
 	GSM::TypeOfNumber mType;
 	GSM::NumberingPlan mPlan;
-	GSM::L3BCDDigits mDigits;
+	const char* mAddressValue;
 
 public:
 
 	TLAddress():TLElement() {}
 
-	TLAddress(GSM::TypeOfNumber wType, GSM::NumberingPlan wPlan, const char* wDigits)
+	TLAddress(GSM::TypeOfNumber wType, GSM::NumberingPlan wPlan, const char* wAddressValue)
 		:TLElement(),
-		mType(wType),mPlan(wPlan),mDigits(wDigits)
+		mType(wType),mPlan(wPlan),mAddressValue(wAddressValue)
 	{ }
 
-	TLAddress(const char* wDigits)
+	TLAddress(const char* wAddressValue)
 		:TLElement(),
-		mType(GSM::NationalNumber),mPlan(GSM::E164Plan),mDigits(wDigits)
+		mType(GSM::AlphanumericNumber),mPlan(GSM::E164Plan),mAddressValue(wAddressValue)
 	{ }
 
-	const char *digits() const { return mDigits.digits(); }
+	const char *addressValue() const { return mAddressValue; }
 	GSM::TypeOfNumber type() const { return mType; }
 	GSM::NumberingPlan plan() const { return mPlan; }
 
-	size_t length() const { return 2 + mDigits.lengthV(); }
+	size_t length() const;
 	void parse(const TLFrame&, size_t&);
 	void write(TLFrame&, size_t&) const;
 	void text(std::ostream&) const;

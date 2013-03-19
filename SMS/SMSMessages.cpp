@@ -358,12 +358,45 @@ void TLAddress::parse(const TLFrame& src, size_t& rp)
 	// even though it looks very similar.
 	// The difference is in the encoding of the length field.
 
-	size_t numDigits = src.readField(rp,8);
-	size_t length = numDigits/2 + (numDigits % 2);
-	if (src.readField(rp, 1) != 1) SMS_READ_ERROR;	
+	size_t addressLength = src.readField(rp,8);
+	size_t length = addressLength/2 + (addressLength % 2);
+	if (src.readField(rp, 1) != 1) SMS_READ_ERROR;
 	mType = (TypeOfNumber)src.readField(rp, 3);
 	mPlan = (NumberingPlan)src.readField(rp, 4);
-	mDigits.parse(src,rp,length);
+	switch (mType) {
+	case AlphanumericNumber:
+		{
+			std::string text;
+			size_t text_length = addressLength*4/7;
+			text.resize(text_length);
+			for (unsigned i=0; i<text_length; i++) {
+				char gsm = src.readFieldReversed(rp,7);
+				text[i] = decodeGSMChar(gsm);
+			}
+			mAddressValue = text.c_str();
+			size_t fill_bits = length*8-text_length*7;
+			if (fill_bits > 0) {
+				// skip fill bits
+				rp += fill_bits;
+			}
+		}
+		break;
+	case UnknownTypeOfNumber:
+	case InternationalNumber:
+	case NationalNumber:
+	case NetworkSpecificNumber:
+	case ShortCodeNumber:
+	case AbbreviatedNumber:
+		{
+			GSM::L3BCDDigits digitNumber;
+			digitNumber.parse(src,rp,length);
+			mAddressValue = digitNumber.digits();
+		}
+		break;
+	default:
+		SMS_READ_ERROR;
+		break;
+	}
 }
 
 
@@ -371,20 +404,90 @@ void TLAddress::text(ostream& os) const
 {
 	os << "type=" << mType;
 	os << " plan=" << mPlan;
-	os << " digits=" << mDigits;
+	os << " digits=" << mAddressValue;
 }
 
 
 
 void TLAddress::write(TLFrame& dest, size_t& wp) const
 {
-	dest.writeField(wp,mDigits.size(),8);
-	dest.writeField(wp, 0x01, 1);
-	dest.writeField(wp, mType, 3);
-	dest.writeField(wp, mPlan, 4);
-	mDigits.write(dest,wp);
+	switch (mType) {
+	case AlphanumericNumber:
+		{
+			unsigned length = strlen(mAddressValue);
+			int bytes = (length*7+7)/8;
+			int filler_bits = bytes*8-length*7;
+			int addressLength = bytes*2;
+			if (filler_bits > 3) {
+				addressLength--;
+			}
+
+			dest.writeField(wp,addressLength,8);
+			dest.writeField(wp, 0x01, 1);
+			dest.writeField(wp, mType, 3);
+			dest.writeField(wp, mPlan, 4);
+
+			BitVector textNumber(bytes*8);
+			size_t np = 0;
+			for (unsigned i=0; i<length; i++) {
+				char gsm = encodeGSMChar(mAddressValue[i]);
+				textNumber.writeFieldReversed(np,gsm,7);
+			}
+
+			if (filler_bits >0) {
+				textNumber.writeField(np,0,filler_bits);
+			}
+			textNumber.LSB8MSB();
+			np = 0;
+			for (int i = 0; i < bytes; i++) {
+				dest.writeField(wp, textNumber.readField(np,8), 8);
+			}
+		}
+		break;
+	case UnknownTypeOfNumber:
+	case InternationalNumber:
+	case NationalNumber:
+	case NetworkSpecificNumber:
+	case ShortCodeNumber:
+	case AbbreviatedNumber:
+		{
+			GSM::L3BCDDigits digitNumber(mAddressValue);
+			dest.writeField(wp,digitNumber.size(),8);
+			dest.writeField(wp, 0x01, 1);
+			dest.writeField(wp, mType, 3);
+			dest.writeField(wp, mPlan, 4);
+			digitNumber.write(dest,wp);
+		}
+		break;
+	default:
+		SMS_READ_ERROR;
+		break;
+	}
 }
 
+
+
+size_t TLAddress::length() const
+{
+	size_t length = 2;
+	switch (mType) {
+	case AlphanumericNumber:
+		length += (strlen(mAddressValue)*7+7)/8;
+		break;
+	case UnknownTypeOfNumber:
+	case InternationalNumber:
+	case NationalNumber:
+	case NetworkSpecificNumber:
+	case ShortCodeNumber:
+	case AbbreviatedNumber:
+	{
+		GSM::L3BCDDigits digitNumber(mAddressValue);
+		length += digitNumber.lengthV();
+	}
+		break;
+	}
+	return length;
+}
 
 
 
