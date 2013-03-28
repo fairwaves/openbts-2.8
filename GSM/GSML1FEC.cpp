@@ -981,12 +981,9 @@ void FCCHL1Encoder::generate()
 	OBJLOG(DEBUG) << "FCCHL1Encoder " << mNextWriteTime;
 	assert(mDownstream);
 	resync();
-	for (int i=0; i<5; i++) {
-		mBurst.time(mNextWriteTime);
-		mDownstream->writeHighSide(mBurst);
-		rollForward();
-	}
-	sleep(1);
+	mBurst.time(mNextWriteTime);
+	mDownstream->writeHighSide(mBurst);
+	rollForward();
 }
 
 
