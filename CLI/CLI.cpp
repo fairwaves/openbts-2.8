@@ -45,10 +45,10 @@
 #include <TMSITable.h>
 #include <RadioResource.h>
 #include <CallControl.h>
-
+#include <MobilityManagement.h>
 #include <Globals.h>
-
-#include "CLI.h"
+#include <SubscriberRegistry.h>
+#include <CLI.h>
 
 #undef WARNING
 
@@ -248,7 +248,7 @@ int dumpTMSIs(const char* filename)
 	fileout.open(filename, ios::out); // erases existing!
 	// FIXME -- Check that the file really opened.
 	// Fake an argument list to call printTMSIs.
-	char* subargv[] = {"tmsis", NULL};
+	char* subargv[] = {(char *)"tmsis", NULL};
 	int subargc = 1;
 	return tmsis(subargc, subargv, fileout);
 }
@@ -325,7 +325,7 @@ int sendsimple(int argc, char** argv, ostream& os)
 		"To: sip:IMSI%s@127.0.0.1\n"
 		"Call-ID: %x@127.0.0.1:%d\n"
 		"CSeq: 1 MESSAGE\n"
-		"Content-Type: text/plain\nContent-Length: %u\n"
+		"Content-Type: text/plain\nContent-Length: %zu\n"
 		"\n%s\n";
 	static char buffer[1500];
 	snprintf(buffer,1499,form,
@@ -734,6 +734,17 @@ int power(int argc, char **argv, ostream& os)
 	return SUCCESS;
 }
 
+int callID(int argc, char** argv, ostream& os)
+{
+    if (argc != 2) return BAD_NUM_ARGS;
+    char * IMSI = argv[1];
+    if (strnlen(IMSI, 32) > 15) {
+	os << IMSI << " is not a valid IMSI" << endl;
+	return BAD_VALUE;
+    }
+    os << "IMSI "<< IMSI << " caller-id number " << gSubscriberRegistry.getCLIDLocal(IMSI) << endl;
+    return SUCCESS;
+}
 
 int rxgain(int argc, char** argv, ostream& os)
 {
@@ -810,6 +821,7 @@ void Parser::addCommands()
 	//addCommand("sendrrlp", sendrrlp, "<IMSI> <hexstring> -- send RRLP message <hexstring> to <IMSI>.");
 	addCommand("load", printStats, "-- print the current activity loads.");
 	addCommand("cellid", cellID, "[MCC MNC LAC CI] -- get/set location area identity (MCC, MNC, LAC) and cell ID (CI)");
+	addCommand("callerid", callID, "[IMSI] -- get caller if for a given IMSI");
 	addCommand("calls", calls, "-- print the transaction table");
 	addCommand("config", config, "[] OR [patt] OR [key val(s)] -- print the current configuration, print configuration values matching a pattern, or set/change a configuration value");
 	addCommand("configsave", configsave, "<path> -- write the current configuration to a file");
