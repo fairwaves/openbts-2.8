@@ -335,7 +335,7 @@ void L3MobileStationClassmark3::parseV(const L3Frame& src, size_t& rp, size_t le
 	// We do this because the parser is incomplete.
 	size_t frp = rp;
 	parseV(src,frp);
-	rp += len*8;
+	rp += len*4;
 }
 
 void L3MobileStationClassmark3::text(ostream& os) const
@@ -347,8 +347,11 @@ void L3MobileStationClassmark3::text(ostream& os) const
 	os << " A5/7=" << mA5_4;
 }
 
-
-
+void L3CipheringKeySequenceNumber::parseV(const L3Frame & src, size_t & rp)
+{
+    mCIValue = src.readField(rp, 4);
+    LOG(DEBUG) << "L3CipheringKeySequenceNumber::parseV mCIValue=" << mCIValue;
+}
 
 void L3CipheringKeySequenceNumber::writeV(L3Frame &dest, size_t& wp) const
 {

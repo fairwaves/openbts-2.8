@@ -403,7 +403,42 @@ bool SubscriberRegistry::useGateway(string ISDN)
 	return cmp!=0;
 }
 
+void SubscriberRegistry::stringToUint(string strRAND, uint64_t *hRAND, uint64_t *lRAND)
+{
+	assert(strRAND.size() == 32);
+	string strhRAND = strRAND.substr(0, 16);
+	string strlRAND = strRAND.substr(16, 16);
+	stringstream ssh;
+	ssh << hex << strhRAND;
+	ssh >> *hRAND;
+	stringstream ssl;
+	ssl << hex << strlRAND;
+	ssl >> *lRAND;
+}
 
+string SubscriberRegistry::uintToString(uint64_t h, uint64_t l)
+{
+	ostringstream os1;
+	os1.width(16);
+	os1.fill('0');
+	os1 << hex << h;
+	ostringstream os2;
+	os2.width(16);
+	os2.fill('0');
+	os2 << hex << l;
+	ostringstream os3;
+	os3 << os1.str() << os2.str();
+	return os3.str();
+}
+
+string SubscriberRegistry::uintToString(uint32_t x)
+{
+	ostringstream os;
+	os.width(8);
+	os.fill('0');
+	os << hex << x;
+	return os.str();
+}
 
 
 

@@ -112,6 +112,11 @@ class L1Encoder {
 	bool mActive;					///< true between open() and close()
 	//@}
 
+	/**@ Cipher state */
+	//@{
+	uint8_t mKc[8];					///< current Kc
+	unsigned mCipherID;				///< current cipher id
+	//@}
 	ViterbiR2O4 mVCoder;	///< nearly all GSM channels use the same convolutional code
 
 	char mDescriptiveString[100];
@@ -174,6 +179,17 @@ class L1Encoder {
 
 	const char* descriptiveString() const { return mDescriptiveString; }
 
+	/**@name Cipher support */
+	//@{
+
+	/** set Kc for ciphering */
+	void setKc(uint8_t * Kc_key) { memcpy(mKc, Kc_key, 8); LOG(INFO) << "Kc set."; }
+
+	/** enable ciphering if Kc is set */
+	void enableEnciphering(unsigned i) { mCipherID = i; }
+
+	unsigned getCipherID() const { return mCipherID; }
+	//@}
 	protected:
 
 	/** Roll write times forward to the next positions. */
@@ -197,6 +213,8 @@ class L1Encoder {
 	*/
 	virtual void sendIdleFill();
 
+	/** Encrypt given burst in-place */
+	void encrypt(BitVector &burst, uint32_t FN);
 };
 
 
@@ -240,6 +258,11 @@ class L1Decoder {
 	L1FEC* mParent;			///< a containing L1 processor, if any
 	//@}
 
+	/**@ Cipher state */
+	//@{
+	uint8_t mKc[8];					///< current Kc
+	unsigned mCipherID;				///< current 
+	//@}
 	ViterbiR2O4 mVCoder;	///< nearly all GSM channels use the same convolutional code
 
 
@@ -258,7 +281,8 @@ class L1Decoder {
 			mRunning(false),
 			mFER(0.0F),
 			mCN(wCN),mTN(wTN),
-			mMapping(wMapping),mParent(wParent)
+			mMapping(wMapping), mParent(wParent),
+			mCipherID(0)
 	{
 		// Start T3101 so that the channel will
 		// become recyclable soon.
@@ -313,6 +337,17 @@ class L1Decoder {
 	TypeAndOffset typeAndOffset() const;	///< this comes from mMapping
 	//@}
 
+	/**@name Cipher support */
+	//@{
+
+	/** set Kc for ciphering */
+	void setKc(uint8_t * Kc_key) { memcpy(mKc, Kc_key, 8); }
+
+	/** enable ciphering if Kc is set */
+	void enableDeciphering(unsigned i) { mCipherID = i; }
+
+	unsigned getCipherID() const { return mCipherID; }
+	//@}
 
 	protected:
 
@@ -330,6 +365,8 @@ class L1Decoder {
 	void countGoodFrame();
 
 	void countBadFrame();
+	/* Decrypt burst in-place */
+	void decrypt(SoftVector &burst, uint32_t FN);
 };
 
 
@@ -345,6 +382,7 @@ class L1FEC {
 
 	L1Encoder* mEncoder;
 	L1Decoder* mDecoder;
+	bool encrypting, decrypting;
 
 	public:
 
@@ -352,7 +390,7 @@ class L1FEC {
 		The L1FEC constructor is over-ridden for different channel types.
 		But the default has no encoder or decoder.
 	*/
-	L1FEC():mEncoder(NULL),mDecoder(NULL) {}
+        L1FEC():mEncoder(NULL), mDecoder(NULL), encrypting(false), decrypting(false) {}
 
 	/** This is no-op because these channels should not be destroyed. */
 	virtual ~L1FEC() {};
@@ -413,6 +451,27 @@ class L1FEC {
 	const char* descriptiveString() const
 		{ assert(mEncoder); return mEncoder->descriptiveString(); }
 
+	void setKc(uint8_t *Kc) {
+	    if (gConfig.getNum("GSM.Cipher")) {
+		assert(mEncoder); mEncoder->setKc(Kc);
+		assert(mDecoder); mDecoder->setKc(Kc);
+	    }
+	}
+
+	unsigned getEncCipherID() const {
+	    assert(mEncoder);
+	    return mEncoder->getCipherID();
+	}
+
+	unsigned getDecCipherID() const {
+	    assert(mDecoder);
+	    return mDecoder->getCipherID();
+	}
+
+	const bool checkEncryption() { return encrypting; }
+	const bool checkDecryption() { return decrypting; }
+	void activateEncryption(unsigned i);
+	void activateDecryption(unsigned i);
 	//@}
 
 

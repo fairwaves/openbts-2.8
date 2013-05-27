@@ -38,12 +38,17 @@
 #include <SIPEngine.h>
 #include <SIPInterface.h>
 
+#include <SIPUtility.h>
+#include <SIPMessage.h>
+#include <SIPEngine.h>
+#include <SubscriberRegistry.h>
 #include <Logger.h>
 #include <Reporting.h>
 #undef WARNING
 
 
 using namespace std;
+using namespace SIP;
 using namespace GSM;
 using namespace Control;
 
@@ -57,6 +62,13 @@ using namespace Control;
 
 L3Message* getMessageCore(LogicalChannel *LCH, unsigned SAPI)
 {
+    if(LCH->type() == AuthTestLCHType)
+    {//handle test authentication channel
+	AuthTestLogicalChannel * L = dynamic_cast<AuthTestLogicalChannel*>(LCH);
+	L3AuthenticationResponse * msg = new L3AuthenticationResponse;
+	msg->setSRES(L->getSRES());
+	return msg;
+    }
 	unsigned timeout_ms = LCH->N200() * T200ms;
 	L3Frame *rcv = LCH->recv(timeout_ms,SAPI);
 	if (rcv==NULL) {
@@ -147,7 +159,29 @@ unsigned  Control::resolveIMSI(bool sameLAI, L3MobileIdentity& mobileID, Logical
 	return 0;
 }
 
+void AuthenticationParameters::set_RAND(string RAND)
+{
+    uint64_t uRAND, lRAND;
+    gSubscriberRegistry.stringToUint(RAND, &uRAND, &lRAND);
+    mRAND = L3RAND(uRAND, lRAND);
+    mRANDset = true;
+}
 
+const char * AuthenticationParameters::get_SRES() const
+{
+    ostringstream os;
+    os.width(8);
+    os.fill('0');
+    os << hex << mSRES.value();
+    return os.str().c_str();
+}
+
+const char * AuthenticationParameters::get_RAND() const
+{
+    ostringstream os;
+    mRAND.text(os);
+    return os.str().c_str();
+}
 
 /* Resolve a mobile ID to an IMSI. */
 void  Control::resolveIMSI(L3MobileIdentity& mobileIdentity, LogicalChannel* LCH)

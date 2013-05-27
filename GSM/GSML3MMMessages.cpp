@@ -75,6 +75,8 @@ ostream& GSM::operator<<(ostream& os, L3MMMessage::MessageType val)
 			os << "Authentication Request"; break;
 		case L3MMMessage::AuthenticationResponse:
 			os << "Authentication Response"; break;
+        case L3MMMessage::AuthenticationReject:
+        os << "AuthenticationReject"; break;
 		default: os << hex << "0x" << (int)val << dec;
 	}
 	return os;
@@ -123,9 +125,9 @@ void L3MMMessage::text(ostream& os) const
 
 void L3LocationUpdatingRequest::parseBody( const  L3Frame &src, size_t &rp )
 {
+		// ciphering key sequence number
+		mCKSN.parseV(src, rp);
 		// skip updating type
-		rp += 4;
-		// skip ciphering ket sequence number
 		rp += 4;
 		mLAI.parseV(src,rp);
 		mClassmark.parseV(src,rp);
@@ -139,6 +141,7 @@ void L3LocationUpdatingRequest::text(ostream& os) const
 	os << "LAI=("<<mLAI<<")";
 	os << " MobileIdentity=("<<mMobileIdentity<<")";
 	os << " classmark=(" << mClassmark << ")";
+	os << " CKSN=(" << mCKSN << ")";
 }
 
 
@@ -224,7 +227,7 @@ void L3CMServiceReject::text(ostream& os) const
 
 void L3CMServiceRequest::parseBody( const L3Frame &src, size_t &rp )
 {
-	rp += 4;			// skip ciphering key seq number
+	mCKSN.parseV(src, rp);	// ciphering key seq number
 	mServiceType.parseV(src,rp);
 	mClassmark.parseLV(src,rp);
 	mMobileIdentity.parseLV(src, rp);
@@ -237,6 +240,7 @@ void L3CMServiceRequest::text(ostream& os) const
 	os << "serviceType=" << mServiceType;
 	os << " mobileIdentity=("<<mMobileIdentity<<")";
 	os << " classmark=(" << mClassmark << ")";
+	os << " CKSN=(" << mCKSN << ")";
 }
 
 
@@ -244,7 +248,8 @@ void L3CMServiceRequest::text(ostream& os) const
 
 void L3CMReestablishmentRequest::parseBody(const L3Frame& src, size_t &rp)
 {
-	rp += 8;			// skip ciphering
+    mCKSN.parseV(src, rp);	// ciphering key seq number
+	rp += 4;		// skip spare half-octet
 	mClassmark.parseLV(src,rp);
 	mMobileID.parseLV(src,rp);
 	mHaveLAI = mLAI.parseTLV(0x13,src,rp);
@@ -256,6 +261,7 @@ void L3CMReestablishmentRequest::text(ostream& os) const
 	os << "mobileID=(" << mMobileID << ")";
 	if (mHaveLAI) os << " LAI=(" << mLAI << ")";
 	os << " classmark=(" << mClassmark << ")";
+	os << " CKSN=(" << mCKSN << ")";
 }
 
 
@@ -333,7 +339,7 @@ void L3AuthenticationRequest::writeBody(L3Frame& dest, size_t &wp) const
 void L3AuthenticationRequest::text(ostream& os) const
 {
 	L3MMMessage::text(os);
-	os << "cksn=" << mCipheringKeySequenceNumber;
+	os << "CKSN=" << mCipheringKeySequenceNumber;
 	os << " RAND=" << mRAND;
 }
 

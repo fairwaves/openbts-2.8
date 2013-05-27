@@ -48,7 +48,6 @@ using namespace GSM;
 
 void LogicalChannel::open()
 {
-	LOG(INFO);
 	if (mSACCH) mSACCH->open();
 	if (mL1) mL1->open();
 	for (int s=0; s<4; s++) {
@@ -63,6 +62,17 @@ void LogicalChannel::open()
 	}
 }
 
+// set Kc for L1 encoder
+bool LogicalChannel::setKc(const char * key)
+{
+    if (!gConfig.getNum("GSM.Cipher")) return false;
+    if (!mL1) return false;
+    uint8_t Kc[8];
+    if(osmo_hexparse(key, Kc, 8) != 8) return false;
+    mL1->setKc(Kc);
+    if (mSACCH) return mSACCH->setKc(key);
+    return true;
+}
 
 void LogicalChannel::connect()
 {
@@ -349,7 +359,37 @@ int LogicalChannel::actualMSPower() const
 int LogicalChannel::actualMSTiming() const
 	{ assert(mSACCH); return mSACCH->actualMSTiming(); }
 
+void LogicalChannel::activateEncryption(unsigned i) {
+    if (gConfig.getNum("GSM.Cipher")) {
+	if (mL1) {
+	    if (mL1->getEncCipherID()==0) {
+		LOG(INFO) << "Activating encryption on " << mL1->descriptiveString();
+		mL1->activateEncryption(i);
+	    }
+	    else {
+		LOG(ERR) << "FAIL : Encryption is already activated on " << mL1->descriptiveString();
+	    }
+	}
+	if (mSACCH) ((LogicalChannel*)mSACCH)->activateEncryption(i);
+    }
+    else LOG(ERR) << "Attempt to activate encryption while ciphering is globally disabled";
+}
 
+void LogicalChannel::activateDecryption(unsigned i) {
+    if (gConfig.getNum("GSM.Cipher")) {
+	if (mL1) {
+	    if (mL1->getDecCipherID()==0) {
+		LOG(INFO) << "Activating decryption on " << mL1->descriptiveString();
+		mL1->activateDecryption(i);
+	    }
+	    else {
+		LOG(ERR) << "FAIL : Decryption is already activated on " << mL1->descriptiveString();
+	    }
+	}
+	if (mSACCH) ((LogicalChannel*)mSACCH)->activateDecryption(i);
+    }
+    else LOG(ERR) << "Attempt to activate decryption while ciphering is globally disabled";
+}
 
 TCHFACCHLogicalChannel::TCHFACCHLogicalChannel(
 		unsigned wCN,

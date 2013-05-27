@@ -100,11 +100,30 @@ void L3CellSelectionParameters::text(ostream& os) const
 	os << " RXLEV-ACCESS-MIN=" << mRXLEV_ACCESS_MIN;
 }
 
+void L3CipheringSettings::writeV(L3Frame& dest, size_t &wp) const
+{
+	dest.writeField(wp,mAlgorithmIdentifier,3);
+	dest.writeField(wp,mSC,1);
+}
+
+void L3CipheringSettings::text(ostream& os) const
+{
+    os << "AlgorithmIdentifier=" << mAlgorithmIdentifier;
+	os << "SC=" << mSC;
+}
+
+void L3CipheringResponse::writeV(L3Frame& dest, size_t &wp) const
+{
+	dest.writeField(wp,0,3); // Spare Bits 0 0 0
+	dest.writeField(wp,mCR,1);
+}
 
 
 
-
-
+void L3CipheringResponse::text(ostream& os) const
+{
+	os << "CR=" << mCR;
+}
 
 void L3ControlChannelDescription::writeV(L3Frame& dest, size_t &wp) const
 {
@@ -706,7 +725,7 @@ void L3SI3RestOctets::text(ostream& os) const
 		os << "CBQ=" << mCBQ;
 		os << " CELL_RESELECT_OFFSET=" << mCELL_RESELECT_OFFSET;
 		os << " TEMPORARY_OFFSET=" << mTEMPORARY_OFFSET;
-		os << " PANALTY_TIME=" << mPENALTY_TIME;
+		os << " PENALTY_TIME=" << mPENALTY_TIME;
 	}
 }
 

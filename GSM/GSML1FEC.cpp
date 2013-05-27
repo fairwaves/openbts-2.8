@@ -25,6 +25,10 @@
 
 
 
+extern "C" {
+#include <osmocom/core/utils.h>
+#include <osmocom/gsm/a5.h>
+}
 #include "GSML1FEC.h"
 #include "GSMCommon.h"
 #include "GSMSAPMux.h"
@@ -37,6 +41,7 @@
 #include <Logger.h>
 #include <assert.h>
 #include <math.h>
+#include <errno.h>
 
 #undef WARNING
 
@@ -190,7 +195,8 @@ L1Encoder::L1Encoder(unsigned wCN, unsigned wTN, const TDMAMapping& wMapping, L1
 	mTotalBursts(0),
 	mPrevWriteTime(gBTS.time().FN(),wTN),
 	mNextWriteTime(gBTS.time().FN(),wTN),
-	mRunning(false),mActive(false)
+	mRunning(false),mActive(false),
+	mCipherID(0)
 {
 	assert(mCN<gConfig.getNum("GSM.Radio.ARFCNs"));
 	assert(mMapping.allowedSlot(mTN));
@@ -230,6 +236,7 @@ void L1Encoder::open()
 	if (!mRunning) start();
 	mTotalBursts=0;
 	mActive = true;
+	mCipherID = 0;
 	resync();
 }
 
@@ -313,6 +320,18 @@ unsigned L1Encoder::ARFCN() const
 }
 
 
+void L1Encoder::encrypt(BitVector &burst, uint32_t FN)
+{
+    ubit_t ks[114];
+    if (-ENOTSUP == osmo_a5(mCipherID, mKc, FN, ks, NULL)) {
+	LOG(ERR) << "A5/" << mCipherID << " not supported by libosmocore!";
+	return;
+    }
+    
+    unsigned e = burst.xor_apply(ks, 114);
+    if (e) LOG(ERR) << "Error while applying gamma " << osmo_hexdump_nospc(ks, 114) << " to " << burst << ": " << e;
+    else LOG(DEBUG) << "gamma " << osmo_hexdump_nospc(ks, 114) << " applied to " << burst;
+}
 
 unsigned L1Decoder::ARFCN() const
 {
@@ -336,6 +355,7 @@ void L1Decoder::open()
 	mT3109.reset();
 	mT3101.set();
 	mActive = true;
+	mCipherID = 0;
 }
 
 
@@ -399,6 +419,17 @@ void L1Decoder::countBadFrame()
 }
 
 
+void L1Decoder::decrypt(SoftVector &burst, uint32_t FN)
+{
+    ubit_t ks[114];
+    if (-ENOTSUP == osmo_a5(mCipherID, mKc, FN, ks, NULL)) {
+	LOG(ERR) << "A5/" << mCipherID << " not supported by libosmocore!";
+	return;
+    }
+    unsigned e = burst.xor_apply(ks, 114);
+    if (e) LOG(ERR) << "Error while applying gamma " << osmo_hexdump_nospc(ks, 114) << " to " << burst << ": " << e;
+    else LOG(DEBUG) << "gamma " << osmo_hexdump_nospc(ks, 114) << "applied to " << burst;
+}
 
 
 void L1FEC::downstream(ARFCNManager* radio)
@@ -418,6 +449,26 @@ void L1FEC::close()
 {
 	if (mEncoder) mEncoder->close();
 	if (mDecoder) mDecoder->close();
+}
+
+void L1FEC::activateEncryption(unsigned i) {
+    assert(mEncoder);
+    if (gConfig.getNum("GSM.Cipher")) {
+	encrypting = true;
+	mEncoder->enableEnciphering(i);
+	LOG(INFO) << "encryption a5/" << i << " enabled on " << descriptiveString();
+    }
+    else LOG(ERR) << "Attempt to activate encryption while ciphering is globally disabled";
+}
+
+void L1FEC::activateDecryption(unsigned i) {
+    assert(mDecoder);
+    if (gConfig.getNum("GSM.Cipher")) {
+	decrypting = true;
+	mDecoder->enableDeciphering(i);
+	LOG(INFO) << "decryption a5/" << i << " enabled on " << descriptiveString();
+    }
+    else LOG(ERR) << "Attempt to activate decryption while ciphering is globally disabled";
 }
 
 bool L1FEC::active() const
@@ -502,7 +553,7 @@ void RACHL1Decoder::writeLowSide(const RxBurst& burst)
 	countGoodFrame();
 	mD.LSB8MSB();
 	unsigned RA = mD.peekField(0,8);
-	OBJLOG(INFO) <<"RACHL1Decoder received RA=" << RA << " at time " << burst.time()
+	OBJLOG(DEBUG) <<"RACHL1Decoder received RA=" << RA << " at time " << burst.time()
 		<< " with RSSI=" << burst.RSSI() << " timingError=" << burst.timingError();
 	gBTS.channelRequest(new Control::ChannelRequestRecord(RA,burst.time(),burst.RSSI(),burst.timingError()));
 }
@@ -586,12 +637,14 @@ bool XCCHL1Decoder::processBurst(const RxBurst& inBurst)
 	inBurst.data2().copyToSegment(mI[B],57);
 
 	// If the burst index is 0, save the time
-	if (B==0)
-		mReadTime = inBurst.time();
+	if (0 == B) mReadTime = inBurst.time();
+
+	// Decrypt the burst
+	if (mCipherID) decrypt(mI[B], inBurst.time().FN());
 
 	// If the burst index is 3, then this is the last burst in the L2 frame.
 	// Return true to indicate that we are ready to deinterleave.
-	return B==3;
+	return 3 == B;
 
 	// TODO -- This is sub-optimal because it ignores the case
 	// where the B==3 burst is simply missing, even though the soft decoder
@@ -706,8 +759,7 @@ bool SACCHL1Decoder::processBurst(const RxBurst& inBurst)
 	// Timing error is a float in symbol intervals.
 	mTimingError[mRSSICounter] = inBurst.timingError();
 
-	OBJLOG(INFO) << "SACCHL1Decoder " << " RSSI=" << inBurst.RSSI()
-			<< " timingError=" << inBurst.timingError();
+	OBJLOG(DEBUG) << "SACCHL1Decoder " << " RSSI=" << inBurst.RSSI() << " timingError=" << inBurst.timingError();
 
 	mRSSICounter++;
 	if (mRSSICounter>3) mRSSICounter=0;
@@ -723,7 +775,7 @@ void SACCHL1Decoder::handleGoodFrame()
 	mActualMSPower = decodePower(mU.peekField(3,5));
 	int TAField = mU.peekField(9,7);
 	if (TAField<64) mActualMSTiming = TAField;
-	OBJLOG(INFO) << "SACCHL1Decoder actuals pow=" << mActualMSPower << " TA=" << mActualMSTiming;
+	OBJLOG(DEBUG) << "SACCHL1Decoder actuals pow=" << mActualMSPower << " TA=" << mActualMSTiming;
 	XCCHL1Decoder::handleGoodFrame();
 }
 
@@ -881,8 +933,9 @@ void XCCHL1Encoder::transmit()
 
 	for (int B=0; B<4; B++) {
 		mBurst.time(mNextWriteTime);
+		// Encrypt the burst
+		if (mCipherID) encrypt(mI[B], mNextWriteTime.FN());
 		// Copy in the "encrypted" bits, GSM 05.03 4.1.5, 05.02 5.2.3.
-		OBJLOG(DEBUG) << "XCCHL1Encoder mI["<<B<<"]=" << mI[B];
 		mI[B].segment(0,57).copyToSegment(mBurst,3);
 		mI[B].segment(57,57).copyToSegment(mBurst,88);
 		// Send it to the radio.
@@ -1094,6 +1147,9 @@ bool TCHFACCHL1Decoder::processBurst( const RxBurst& inBurst)
 	// GSM 05.03 3.1.4
 	inBurst.data1().copyToSegment(mI[B],0);
 	inBurst.data2().copyToSegment(mI[B],57);
+
+	// Decrypt the burst
+	if (mCipherID) decrypt(mI[B], inBurst.time().FN());
 
 	// Every 4th frame is the start of a new block.
 	// So if this isn't a "4th" frame, return now.
@@ -1397,6 +1453,8 @@ void TCHFACCHL1Encoder::dispatch()
 	for (int B=0; B<4; B++) {
 		// set TDMA position
 		mBurst.time(mNextWriteTime);
+		// Encrypt the burst
+		if (mCipherID) encrypt(mI[B+mOffset], mNextWriteTime.FN());
 		// copy in the bits
 		mI[B+mOffset].segment(0,57).copyToSegment(mBurst,3);
 		mI[B+mOffset].segment(57,57).copyToSegment(mBurst,88);
@@ -1471,7 +1529,7 @@ void SACCHL1Decoder::setPhy(float wRSSI, float wTimingError)
 	// Used to initialize L1 phy parameters.
 	for (int i=0; i<4; i++) mRSSI[i]=wRSSI;
 	for (int i=0; i<4; i++) mTimingError[i]=wTimingError;
-	OBJLOG(INFO) << "SACCHL1Decoder RSSI=" << wRSSI << "timingError=" << wTimingError;
+	OBJLOG(DEBUG) << "SACCHL1Decoder RSSI=" << wRSSI << "timingError=" << wTimingError;
 }
 
 void SACCHL1Decoder::setPhy(const SACCHL1Decoder& other)
@@ -1482,7 +1540,7 @@ void SACCHL1Decoder::setPhy(const SACCHL1Decoder& other)
 	mActualMSTiming = other.mActualMSTiming;
 	for (int i=0; i<4; i++) mRSSI[i]=other.mRSSI[i];
 	for (int i=0; i<4; i++) mTimingError[i]=other.mTimingError[i];
-	OBJLOG(INFO) << "SACCHL1Decoder actuals RSSI=" << mRSSI[0] << "timingError=" << mTimingError[0]
+	OBJLOG(DEBUG) << "SACCHL1Decoder actuals RSSI=" << mRSSI[0] << "timingError=" << mTimingError[0]
 		<< " MSPower=" << mActualMSPower << " MSTiming=" << mActualMSTiming;
 }
 
@@ -1504,7 +1562,7 @@ void SACCHL1Encoder::setPhy(float wRSSI, float wTimingError)
 	float minPower = gConfig.getNum("GSM.MS.Power.Min");
 	if (mOrderedMSPower>maxPower) mOrderedMSPower=maxPower;
 	else if (mOrderedMSPower<minPower) mOrderedMSPower=minPower;
-	OBJLOG(INFO) <<"SACCHL1Encoder RSSI=" << RSSI << " target=" << RSSITarget
+	OBJLOG(DEBUG) <<"SACCHL1Encoder RSSI=" << RSSI << " target=" << RSSITarget
 		<< " deltaP=" << deltaP << " actual=" << actualPower << " order=" << mOrderedMSPower;
 	// Timing Advance
 	float timingError = sib.timingError();
@@ -1513,7 +1571,7 @@ void SACCHL1Encoder::setPhy(float wRSSI, float wTimingError)
 	float maxTiming = gConfig.getNum("GSM.MS.TA.Max");
 	if (mOrderedMSTiming<0.0F) mOrderedMSTiming=0.0F;
 	else if (mOrderedMSTiming>maxTiming) mOrderedMSTiming=maxTiming;
-	OBJLOG(INFO) << "SACCHL1Encoder timingError=" << timingError  <<
+	OBJLOG(DEBUG) << "SACCHL1Encoder timingError=" << timingError  <<
 		" actual=" << actualTiming << " ordered=" << mOrderedMSTiming;
 }
 
@@ -1524,7 +1582,7 @@ void SACCHL1Encoder::setPhy(const SACCHL1Encoder& other)
 	// from those of a preexisting established channel.
 	mOrderedMSPower = other.mOrderedMSPower;
 	mOrderedMSTiming = other.mOrderedMSTiming;
-	OBJLOG(INFO) << "SACCHL1Encoder orders MSPower=" << mOrderedMSPower << " MSTiming=" << mOrderedMSTiming;
+	OBJLOG(DEBUG) << "SACCHL1Encoder orders MSPower=" << mOrderedMSPower << " MSTiming=" << mOrderedMSTiming;
 }
 
 
@@ -1540,7 +1598,7 @@ SACCHL1Encoder::SACCHL1Encoder(unsigned wCN, unsigned wTN, const TDMAMapping& wM
 
 void SACCHL1Encoder::open()
 {
-	OBJLOG(INFO) <<"SACCHL1Encoder";
+	OBJLOG(DEBUG) <<"SACCHL1Encoder";
 	XCCHL1Encoder::open();
 	mOrderedMSPower = 33;
 	mOrderedMSTiming = 0;
@@ -1562,7 +1620,7 @@ SACCHL1Decoder* SACCHL1Encoder::SACCHSibling()
 
 void SACCHL1Encoder::sendFrame(const L2Frame& frame)
 {
-	OBJLOG(INFO) << "SACCHL1Encoder " << frame;
+	OBJLOG(DEBUG) << "SACCHL1Encoder " << frame;
 
 	// Physical header, GSM 04.04 6, 7.1
 	// Power and timing control, GSM 05.08 4, GSM 05.10 5, 6.
@@ -1602,7 +1660,7 @@ void SACCHL1Encoder::sendFrame(const L2Frame& frame)
 	// Write physical header into mU and then call base class.
 
 	// SACCH physical header, GSM 04.04 6.1, 7.1.
-	OBJLOG(INFO) <<"SACCHL1Encoder orders pow=" << mOrderedMSPower << " TA=" << mOrderedMSTiming;
+	OBJLOG(DEBUG) <<"SACCHL1Encoder orders pow=" << mOrderedMSPower << " TA=" << mOrderedMSTiming;
 	mU.fillField(0,encodePower(mOrderedMSPower),8);
 	mU.fillField(8,(int)(mOrderedMSTiming+0.5F),8);	// timing (GSM 04.04 6.1)
 	OBJLOG(DEBUG) << "SACCHL1Encoder phy header " << mU.head(16);

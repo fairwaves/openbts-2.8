@@ -99,7 +99,7 @@ public:
 
 	size_t lengthV() const { return 1; }	
 	void writeV( L3Frame& dest, size_t &wp ) const;
-	void parseV(const L3Frame&, size_t&) { assert(0); }
+	void parseV(const L3Frame&, size_t&);
 	void parseV(const L3Frame&, size_t& , size_t) { assert(0); }
 	void text(std::ostream&) const;
 };

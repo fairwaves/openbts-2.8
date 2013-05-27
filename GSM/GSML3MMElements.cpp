@@ -31,8 +31,12 @@
 
 #include <time.h>
 #include "GSML3MMElements.h"
+#include <SubscriberRegistry.h>
 #include <Logger.h>
 
+#include <algorithm>
+#include <cstdlib>
+#include <string>
 
 using namespace std;
 using namespace GSM;
@@ -81,6 +85,10 @@ void L3RejectCause::text(ostream& os) const
 
 
 
+void L3RejectCause::parseV(const L3Frame & src, size_t & rp)
+{
+    mRejectCause = src.readField(rp, 8);
+}
 
 void L3NetworkName::writeV(L3Frame& dest, size_t &wp) const
 {
@@ -233,8 +241,16 @@ void L3RAND::writeV(L3Frame& dest, size_t &wp) const
 }
 
 void L3RAND::text(ostream& os) const
-{
-	os << hex << "0x" << mRUpper << mRLower << dec;
+{ // need exactly 32 characters for successful parsing by inflexible osmo_hexparse(...)
+    ostringstream os_h, os_l, os_x;
+    os_h.width(16);
+    os_h.fill('0');
+    os_h << hex << mRUpper;
+    os_l.width(16);
+    os_l.fill('0');
+    os_l << hex << mRLower;
+    os_x << os_h.str() << os_l.str();
+    os << os_x.str();
 }
 
 void L3SRES::parseV(const L3Frame& src, size_t &rp)

@@ -93,6 +93,7 @@ class L3RRMessage : public L3Message {
 		///@name ciphering
 		//@{
 		CipheringModeCommand=0x35,
+		CipheringModeComplete=0x32,
 		//@}
 		///@name miscellaneous
 		//@{
@@ -224,6 +225,7 @@ class L3PagingResponse : public L3RRMessageNRO {
 
 	L3MobileStationClassmark2 mClassmark;
 	L3MobileIdentity mMobileID;
+	L3CipheringKeySequenceNumber mCKSN;
 
 	public:
 
@@ -237,8 +239,50 @@ class L3PagingResponse : public L3RRMessageNRO {
 
 };
 
+/** Ciphering Command, GSM 04.08 9.1.9 */
+class L3CipheringModeCommand : public L3RRMessageNRO {
 
+	private:
 
+	L3CipheringSettings mSetting;
+	L3CipheringResponse mResponse;
+
+	public:
+
+        L3CipheringModeCommand():L3RRMessageNRO() {}
+	L3CipheringModeCommand(unsigned a5_version):L3RRMessageNRO() {
+	    mSetting = L3CipheringSettings(a5_version ? 1 : 0, a5_version);
+	}
+
+	void Setting(const L3CipheringSettings& wSetting) { mSetting = wSetting; }
+        void Response(const L3CipheringResponse& wResponse) { mResponse = wResponse; }
+
+	int MTI() const { return CipheringModeCommand; }
+	size_t l2BodyLength() const { return 1; }//FIXME: calculate correct value
+	void writeBody(L3Frame& dest, size_t& wp) const;
+	void text(std::ostream&) const;
+
+};
+
+/** Ciphering Complete, GSM 04.08 9.1.10 */
+class L3CipheringModeComplete : public L3RRMessageNRO {
+
+	protected:
+    bool mHaveMobileID;
+	L3MobileIdentity mMobileID;
+
+	public:
+    L3CipheringModeComplete():L3RRMessageNRO() {}
+
+	const L3MobileIdentity& mobileIdentity() const { return mMobileID; }
+
+	int MTI() const { return CipheringModeComplete; }
+
+	size_t l2BodyLength() const;
+	void parseBody(const L3Frame& src, size_t &rp);
+	void text(std::ostream&) const;
+
+};
 
 
 

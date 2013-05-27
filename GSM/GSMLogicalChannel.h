@@ -36,6 +36,10 @@
 
 #include <iostream>
 
+extern "C" {
+#include <osmocom/core/utils.h>
+}
+#include <ControlCommon.h>
 #include "GSML1FEC.h"
 #include "GSMSAPMux.h"
 #include "GSML2LAPDm.h"
@@ -62,6 +66,9 @@ class SACCHLogicalChannel;
 class L3Message;
 class L3RRMessage;
 
+enum ChanCipherState {
+    Encrypting, Decrypting, EncryptingAndDecrypting, NoCipher
+};
 
 /**
 	A complete logical channel.
@@ -205,6 +212,35 @@ public:
 	/** Return true if the channel is active. */
 	bool active() const { assert(mL1); return mL1->active(); }
 
+	// set Kc for L1 encoder
+	bool setKc(const char * key);
+
+	// obtain channel en(de)cryption status if possible
+	const ChanCipherState getCiphering() const {
+	    if (mL1) {
+		bool e = mL1->checkEncryption();
+		bool d = mL1->checkDecryption();
+		if (e && d ) return EncryptingAndDecrypting;
+		if (e) return Encrypting;
+		if (d) return Decrypting;
+	    }
+	    return NoCipher;
+	}
+
+	unsigned getCipherID() const {
+	    switch(getCiphering()) {
+	    case GSM::EncryptingAndDecrypting: return getEncCipherID();
+	    case GSM::Encrypting: return getEncCipherID();
+	    case GSM::Decrypting: return getDecCipherID();
+	    default: return 0;
+	    }
+	}
+
+	unsigned getEncCipherID() const { if (mL1) return mL1->getEncCipherID(); return 0; }
+	unsigned getDecCipherID() const { if (mL1) return mL1->getDecCipherID(); return 0; }
+
+	void activateEncryption(unsigned i);
+	void activateDecryption(unsigned i);
 	/** The TDMA parameters for the transmit side. */
 	const TDMAMapping& txMapping() const { assert(mL1); return mL1->txMapping(); }
 
@@ -305,6 +341,30 @@ class SDCCHLogicalChannel : public LogicalChannel {
 
 
 
+/* Logical channel for authentication testing:
+    - no actual tramsmission happens
+    - calls always succeed
+*/
+class AuthTestLogicalChannel : public LogicalChannel {
+
+    private:
+	Control::AuthenticationParameters authParams;
+
+    public:
+        AuthTestLogicalChannel(const Control::AuthenticationParameters& ap):authParams(ap) {}
+	void send(const L3Frame& frame, unsigned SAPI = 0) {}
+
+// Needed for special handling inside Control::getMessage(LCH);
+	ChannelType type() const { return AuthTestLCHType; }
+	L3SRES getSRES() {
+	    L3SRES atSRES;
+	    if (authParams.isSRESset()) return authParams.SRES();
+	    return atSRES;
+	}
+
+// This will be interpreted as "Ciphering Error" by authentication routine
+	L3Frame * recv(unsigned timeout_ms = 15000, unsigned SAPI = 0) { return NULL; }
+};
 
 
 /**

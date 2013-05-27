@@ -233,6 +233,7 @@ enum ChannelType {
 	LoopbackFullType,		///< loopback testing
 	LoopbackHalfType,		///< loopback testing
 	AnyDCCHType,			///< any dedicated control channel
+	AuthTestLCHType,		///< authentication testing channel
 	UndefinedCHType,		///< undefined
 	//@}
 };
