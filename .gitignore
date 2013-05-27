@@ -1,0 +1,76 @@
+# autoreconf by-products
+*.in
+
+aclocal.m4
+autom4te.cache/
+config.guess
+config.h.in
+config.sub
+configure
+depcomp
+install-sh
+ltmain.sh
+missing
+
+# configure by-products
+.deps
+Makefile
+
+config.h
+config.log
+config.status
+libtool
+stamp-h1
+
+# build by-products
+.libs
+*.o
+*.la
+*.lo
+
+# final executables
+CLI/TokenizerTest
+CommonLibs/BitVectorTest
+CommonLibs/ConfigurationTest
+CommonLibs/ConnectionSocketsTest
+CommonLibs/F16Test
+CommonLibs/InterthreadTest
+CommonLibs/LogTest
+CommonLibs/RegexpTest
+CommonLibs/SocketsTest
+CommonLibs/TimevalTest
+CommonLibs/VectorTest
+HLR/HLRTest
+Transceiver/USRPping
+Transceiver/transceiver
+Transceiver52M/USRPping
+Transceiver52M/sigProcLibTest
+Transceiver52M/transceiver
+TransceiverRAD1/RAD1Cmd
+TransceiverRAD1/RAD1RxRawPower
+TransceiverRAD1/RAD1SN
+TransceiverRAD1/RAD1ping
+TransceiverRAD1/sigProcLibTest
+TransceiverRAD1/transceiver
+apps/OpenBTS
+apps/OpenBTScli
+smqueue/smqueue
+
+# untracked config and temporary files
+apps/OpenBTS.config
+apps/TMSITable.txt
+apps/ChannelTable.db
+apps/TMSITable.db
+apps/transceiver
+apps/OpenBTSCLI
+apps/OpenBTSDo
+CommonLibs/exampleconfig.db
+ChannelTable.db
+TMSITable.db
+apps/sqlite3dir/
+apps/etc/
+
+# Temporary/Backup files
+*.*~
+.*.swp
+
